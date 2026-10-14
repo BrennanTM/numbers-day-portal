@@ -70,6 +70,9 @@ table.rows th, table.rows td { padding: 4px 4px; border-bottom: 1px solid var(--
 table.rows th { font-weight: 600; color: var(--muted); font-size: 12px; }
 table.rows input { width: 100%; padding: 4px 6px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); font-family: var(--mono); font-size: 13px; }
 .scroll { overflow-x: auto; }
+.drop { border: 2px dashed var(--line-strong); border-radius: var(--radius); padding: 12px 14px; text-align: center; color: var(--muted); font-size: 14px; margin-bottom: 10px; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop label { color: var(--fg); text-decoration: underline; cursor: pointer; display: inline; font-weight: 600; margin: 0; }
 .out { display: grid; gap: 14px; align-content: start; min-width: 0; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .toolbar .subject { flex: 1 1 320px; display: flex; gap: 8px; align-items: center; }
@@ -132,7 +135,9 @@ footer { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block:
 
     <div class="card">
       <h2>3. Disability rates (Table 16)</h2>
-      <p class="hint">These are not on the API. Type the four monthly rates from the unpublished BLS Table 16; the page keeps them in this browser and averages the 12 months ending with the reference month.</p>
+      <p class="hint">These are not on the API. Drop the monthly BLS file (disability_YYYY.MM.pdf) here and the page reads Table 16 itself, or type the four rates. Rows stay in this browser; the 12 months ending with the reference month are averaged.</p>
+      <div class="drop" id="pdfDrop">Drop the BLS disability PDF here, or <label for="pdfFile">choose the file</label><input type="file" id="pdfFile" accept="application/pdf,.pdf" hidden></div>
+      <p class="hint" id="pdfStatus" aria-live="polite"></p>
       <div class="scroll">
         <table class="rows" id="disabTable">
           <thead><tr><th>Month</th><th>Vet, dis.</th><th>Nonvet, dis.</th><th>Vet, no dis.</th><th>Nonvet, no dis.</th><th></th></tr></thead>
@@ -437,10 +442,92 @@ $("addRow").addEventListener("click", () => {
   setRows(rows);
 });
 $("clearRows").addEventListener("click", () => { if (getRows().length && $("clearRows").dataset.armed) { setRows([]); delete $("clearRows").dataset.armed; $("clearRows").textContent = "Clear"; } else { $("clearRows").dataset.armed = "1"; $("clearRows").textContent = "Click again to clear"; setTimeout(() => { delete $("clearRows").dataset.armed; $("clearRows").textContent = "Clear"; }, 3000); } });
+const LEVEL_COLS = COLS.flatMap(c => [c + "_labor_force", c + "_unemployed"]);
 function rowsAsCsv() {
   const rows = getRows().slice().sort((a, b) => a.month < b.month ? -1 : 1);
-  return ["month," + COLS.join(",")].concat(rows.map(r => [r.month].concat(COLS.map(c => r[c] == null ? "" : r[c])).join(","))).join("\n") + "\n";
+  const withLevels = rows.some(r => LEVEL_COLS.some(c => r[c] != null));
+  const cols = withLevels ? COLS.concat(LEVEL_COLS) : COLS;
+  return ["month," + cols.join(",")].concat(rows.map(r => [r.month].concat(cols.map(c => r[c] == null ? "" : r[c])).join(","))).join("\n") + "\n";
 }
+
+// ----- Table 16 straight from the BLS PDF -----
+function parseTable16Text(text) {
+  const norm = text.replace(/\s+/g, " ");
+  const m = norm.match(/disability status, (.+?) \(Source/);
+  if (!m) throw new Error("this does not look like the first page of Table 16.");
+  const period = m[1].trim();
+  const mm = period.match(/^([A-Z][a-z]+) (\d{4})$/); const mi = mm ? MONTHS.indexOf(mm[1]) : -1;
+  if (mi < 0) throw new Error("Table 16 here covers '" + period + "', not a single month. Use the monthly file, disability_YYYY.MM.pdf.");
+  if (norm.slice(0, 300).includes("Continued")) throw new Error("this is a continuation page of Table 16.");
+  const tokens = norm.split(" ");
+  const find = (phrase, from) => { const w = phrase.split(" "); for (let i = from; i <= tokens.length - w.length; i++) { let ok = true; for (let j = 0; j < w.length; j++) if (tokens[i + j] !== w[j]) { ok = false; break; } if (ok) return i; } return -1; };
+  const dis = find("Persons with a disability", 0); const nodis = dis < 0 ? -1 : find("Persons with no disability", dis + 1);
+  if (dis < 0 || nodis < 0) throw new Error("could not find the disability sections on the page.");
+  const isNum = t => t === "-" || /^-?[\d,]*\.?\d+$/.test(t);
+  const num = t => t === "-" ? null : parseFloat(t.replace(/,/g, ""));
+  const row = (label, start, end) => { for (let i = start; i < end; i++) { const v = tokens.slice(i + 1, i + 9); if (tokens[i] === label && v.length === 8 && v.every(isNum)) return v.map(num); } throw new Error("could not find the " + label + " row."); };
+  const bounds = { dis: [dis, nodis], nodis: [nodis, tokens.length] };
+  const spec = { vet_disability: ["dis", "Veterans"], nonvet_disability: ["dis", "Nonveterans"], vet_no_disability: ["nodis", "Veterans"], nonvet_no_disability: ["nodis", "Nonveterans"] };
+  const out = { month: mkey(+mm[2], mi + 1), period, rates: {}, labor_force: {}, unemployed: {}, flags: [] };
+  for (const [col, [sec, label]] of Object.entries(spec)) {
+    const v = row(label, bounds[sec][0], bounds[sec][1]);
+    out.labor_force[col] = v[1]; out.unemployed[col] = v[5]; out.rates[col] = v[6];
+    const nice = label + ", persons with " + (sec === "dis" ? "a" : "no") + " disability";
+    if (v[6] == null) out.flags.push(nice + ": rate suppressed by BLS.");
+    else if (v[1] != null && v[1] < 75) out.flags.push(nice + ": labor force below the 75,000 BLS publication threshold.");
+    else if (v[1] && v[5] != null && Math.abs(100 * v[5] / v[1] - v[6]) > 0.15) out.flags.push(nice + ": rate does not match unemployed over labor force; check the page.");
+  }
+  return out;
+}
+async function loadPdfJs() {
+  if (window.pdfjsLib) return window.pdfjsLib;
+  await new Promise((res, rej) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    sc.onload = res; sc.onerror = () => rej(new Error("the PDF reader could not be loaded (cdnjs.cloudflare.com may be blocked here). Type the four rates instead."));
+    document.head.appendChild(sc);
+  });
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  return window.pdfjsLib;
+}
+async function pageText(page) {
+  const content = await page.getTextContent();
+  const lines = new Map();
+  for (const it of content.items) {
+    if (!it.str || !it.str.trim()) continue;
+    const y = Math.round(it.transform[5]);
+    if (!lines.has(y)) lines.set(y, []);
+    lines.get(y).push({ x: it.transform[4], s: it.str });
+  }
+  return [...lines.entries()].sort((a, b) => b[0] - a[0]).map(([, arr]) => arr.sort((a, b) => a.x - b.x).map(a => a.s).join(" ")).join("\n");
+}
+async function importPdf(file) {
+  $("pdfStatus").textContent = "Reading " + file.name + "…";
+  try {
+    const pdfjs = await loadPdfJs();
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    let parsed = null;
+    for (let i = doc.numPages; i >= Math.max(1, doc.numPages - 60); i--) {
+      const text = await pageText(await doc.getPage(i));
+      const head = text.replace(/\s+/g, " ").slice(0, 300);
+      if (head.includes("Table 16.") && !head.includes("Continued")) { parsed = parseTable16Text(text); break; }
+    }
+    if (!parsed) throw new Error("no Table 16 page in the last 60 pages of " + file.name + ".");
+    const rows = getRows(); const i = rows.findIndex(r => r.month === parsed.month);
+    const row = { month: parsed.month };
+    for (const c of COLS) { row[c] = parsed.rates[c]; row[c + "_labor_force"] = parsed.labor_force[c]; row[c + "_unemployed"] = parsed.unemployed[c]; }
+    if (i >= 0) rows[i] = row; else rows.push(row);
+    setRows(rows);
+    $("pdfStatus").textContent = parsed.period + " from " + file.name + ": " + COLS.map(c => fmt(parsed.rates[c])).join(" / ") +
+      (i >= 0 ? ". Replaced the existing row." : ". Row added.") + (parsed.flags.length ? " " + parsed.flags.join(" ") : "");
+    toast("Table 16 row " + (i >= 0 ? "updated" : "added") + " for " + parsed.period);
+  } catch (e) { $("pdfStatus").textContent = "Could not read the PDF: " + (e && e.message || e); }
+}
+$("pdfFile").addEventListener("change", e => { const f = e.target.files[0]; if (f) importPdf(f); e.target.value = ""; });
+const dropZone = $("pdfDrop");
+["dragenter", "dragover"].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove("over"); }));
+dropZone.addEventListener("drop", e => { const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) importPdf(f); });
 $("exportCsv").addEventListener("click", () => {
   if (!getRows().length) { toast("No rows to export yet."); return; }
   const blob = new Blob([rowsAsCsv()], { type: "text/csv" }); const a = document.createElement("a");
@@ -460,7 +547,7 @@ $("csvFile").addEventListener("change", e => {
     for (const l of lines) {
       const c = l.split(",").map(s => s.trim());
       const r = { month: c[idx("month")] };
-      for (const col of COLS) { const v = (c[idx(col)] || "").toLowerCase(); r[col] = (v === "" || v === "-" || v === "na" || v === "n/a") ? null : parseFloat(v); }
+      for (const col of COLS.concat(LEVEL_COLS)) { if (idx(col) < 0) continue; const v = (c[idx(col)] || "").toLowerCase(); r[col] = (v === "" || v === "-" || v === "na" || v === "n/a") ? null : parseFloat(v); }
       byMonth[r.month] = r;
     }
     setRows(Object.values(byMonth)); toast("Imported " + lines.length + " rows");
