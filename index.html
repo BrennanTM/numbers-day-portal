@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VETS Numbers Day</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a workbench. A setup rail on the left, the finished email on the right; one column on phones. */
+:root {
+  --bg: #f4f6f9; --surface: #ffffff; --fg: #1b2230; --muted: #5a6474; --line: #d5dbe4; --line-strong: #a9b3c1;
+  --navy: #162e51; --navy-fg: #ffffff; --accent: #c8322b; --accent-fg: #ffffff; --accent-soft: #fbe9e7;
+  --ok: #2e7d32; --ok-soft: #e4f2e5; --warn: #7a4a00; --warn-soft: #fff2d9; --focus: #2491ff; --code-bg: #eef1f5;
+  --font: "Public Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "Roboto Mono", Consolas, "Courier New", monospace;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1621; --surface: #182130; --fg: #e6ebf2; --muted: #9ba7b8; --line: #2a3648; --line-strong: #46556b;
+    --navy: #0c1a2e; --navy-fg: #ffffff; --accent: #ff6f66; --accent-fg: #1b0b0a; --accent-soft: #3a2224;
+    --ok: #7fd08a; --ok-soft: #1d3322; --warn: #ffcf7a; --warn-soft: #3a2d12; --focus: #58a6ff; --code-bg: #111926;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1621; --surface: #182130; --fg: #e6ebf2; --muted: #9ba7b8; --line: #2a3648; --line-strong: #46556b;
+  --navy: #0c1a2e; --navy-fg: #ffffff; --accent: #ff6f66; --accent-fg: #1b0b0a; --accent-soft: #3a2224;
+  --ok: #7fd08a; --ok-soft: #1d3322; --warn: #ffcf7a; --warn-soft: #3a2d12; --focus: #58a6ff; --code-bg: #111926;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.5; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3 { margin: 0; text-wrap: balance; line-height: 1.2; }
+.top { background: var(--navy); color: var(--navy-fg); padding-block: 18px; padding-inline: 20px; }
+.top .inner { max-width: 1240px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand h1 { font-size: 20px; font-weight: 700; letter-spacing: .01em; }
+.brand span { opacity: .85; font-size: 14px; }
+.status { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.pill { border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 4px 12px; }
+.pill b { font-weight: 600; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 22px 40px; padding-inline: 20px; display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 22px; }
+@media (max-width: 880px) { .wrap { grid-template-columns: 1fr; } }
+.rail { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; }
+.card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 10px; font-weight: 600; }
+.card p { margin: 0 0 10px; }
+.hint { color: var(--muted); font-size: 13px; }
+label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+input[type=text], input[type=password], input[type=month], select, textarea { width: 100%; border: 1px solid var(--line-strong); border-radius: 4px; padding: 8px 10px; background: var(--surface); }
+textarea { min-height: 64px; resize: vertical; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row > * { min-width: 0; }
+.grow { flex: 1 1 160px; }
+.btn { border: 1px solid var(--line-strong); background: var(--surface); border-radius: 4px; padding: 8px 14px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+.btn:hover { border-color: var(--fg); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+.btn.primary:hover { filter: brightness(.95); }
+.btn.big { width: 100%; padding: 14px; font-size: 16px; }
+.btn[disabled] { opacity: .55; cursor: wait; }
+.btn.small { padding: 4px 10px; font-weight: 500; font-size: 13px; }
+.saved { color: var(--ok); font-size: 13px; }
+table.rows { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+table.rows th, table.rows td { padding: 4px 4px; border-bottom: 1px solid var(--line); text-align: left; }
+table.rows th { font-weight: 600; color: var(--muted); font-size: 12px; }
+table.rows input { width: 100%; padding: 4px 6px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); font-family: var(--mono); font-size: 13px; }
+.scroll { overflow-x: auto; }
+.out { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.toolbar .subject { flex: 1 1 320px; display: flex; gap: 8px; align-items: center; }
+.toolbar .subject input { flex: 1; }
+.alerts { display: grid; gap: 8px; }
+.alert { border-radius: 4px; padding: 10px 12px; border: 1px solid transparent; font-size: 14px; }
+.alert.warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+.alert.ok { background: var(--ok-soft); color: var(--ok); }
+.alert.err { background: var(--accent-soft); color: var(--accent); }
+.preview-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.badge { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: var(--code-bg); color: var(--muted); }
+.badge.live { background: var(--ok-soft); color: var(--ok); }
+/* The email itself is rendered with its own inline styles so what you see is what pastes. */
+#email { background: #ffffff; color: #000000; border: 1px solid var(--line); border-radius: 4px; padding: 20px; overflow-x: auto; }
+details summary { cursor: pointer; font-weight: 600; }
+table.data { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; margin-top: 10px; }
+table.data th, table.data td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: right; }
+table.data th:first-child, table.data td:first-child { text-align: left; }
+table.data th { color: var(--muted); font-weight: 600; font-size: 12px; }
+table.data td.id { font-family: var(--mono); font-size: 12px; text-align: left; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 6px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100% - 32px); }
+.toast.show { opacity: 1; }
+footer { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 0 30px; color: var(--muted); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="inner">
+    <div class="brand"><h1>VETS Numbers Day</h1><span>Veteran unemployment compilation, built in your browser from the BLS API</span></div>
+    <div class="status" aria-live="polite">
+      <span class="pill" id="pillNext">Next release: …</span>
+      <span class="pill" id="pillLatest">Latest published: not checked yet</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="rail" aria-label="Setup">
+    <div class="card">
+      <h2>1. BLS API key</h2>
+      <p class="hint">Register once at data.bls.gov/registrationEngine with a DOL address. The key is saved in this browser only and is sent only to api.bls.gov.</p>
+      <label for="apiKey">Registration key</label>
+      <div class="row">
+        <input class="grow" type="password" id="apiKey" autocomplete="off" spellcheck="false" placeholder="32-character key">
+        <button class="btn small" type="button" id="toggleKey" aria-label="Show or hide the key">Show</button>
+        <button class="btn small" type="button" id="saveKey">Save</button>
+      </div>
+      <div class="saved" id="keyStatus" aria-live="polite"></div>
+    </div>
+
+    <div class="card">
+      <h2>2. Month and note</h2>
+      <label for="month">Reference month</label>
+      <select id="month"><option value="">Latest published (default)</option></select>
+      <p class="hint">The list fills in after the first build.</p>
+      <label for="note">Optional sentence after the first line</label>
+      <textarea id="note" placeholder="FYSA: ..."></textarea>
+    </div>
+
+    <div class="card">
+      <h2>3. Disability rates (Table 16)</h2>
+      <p class="hint">These are not on the API. Type the four monthly rates from the unpublished BLS Table 16; the page keeps them in this browser and averages the 12 months ending with the reference month.</p>
+      <div class="scroll">
+        <table class="rows" id="disabTable">
+          <thead><tr><th>Month</th><th>Vet, dis.</th><th>Nonvet, dis.</th><th>Vet, no dis.</th><th>Nonvet, no dis.</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn small" type="button" id="addRow">Add month</button>
+        <label class="btn small" for="csvFile" style="margin:0">Import CSV</label>
+        <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
+        <button class="btn small" type="button" id="clearRows">Clear</button>
+      </div>
+      <p class="hint" id="disabHint" style="margin-top:8px"></p>
+    </div>
+
+    <div class="card">
+      <button class="btn primary big" type="button" id="build">Build this month's email</button>
+      <p class="hint" style="margin:10px 0 0">Makes 16 requests to api.bls.gov. Nothing else leaves this page.</p>
+      <div class="hint" id="buildStatus" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="out" aria-label="Email">
+    <div class="card">
+      <div class="toolbar">
+        <div class="subject">
+          <label for="subject" style="margin:0">Subject</label>
+          <input type="text" id="subject">
+          <button class="btn small" type="button" id="copySubject">Copy</button>
+        </div>
+        <button class="btn primary" type="button" id="copyEmail">Copy email for Outlook</button>
+        <button class="btn" type="button" id="copyText">Copy as plain text</button>
+        <button class="btn" type="button" id="copyJson">Copy audit JSON</button>
+        <button class="btn" type="button" id="downloadJson">Download JSON</button>
+      </div>
+    </div>
+
+    <div class="alerts" id="alerts"></div>
+
+    <div class="card">
+      <div class="preview-head">
+        <h2 style="margin:0">Email body</h2>
+        <span class="badge" id="badge">Example: September 2026</span>
+      </div>
+      <div id="email"></div>
+    </div>
+
+    <div class="card">
+      <details id="numbers">
+        <summary>Numbers behind the email</summary>
+        <div class="scroll"><table class="data" id="numbersTable"><thead><tr><th>Series</th><th>ID</th><th>Value</th><th>Prev. month</th><th>Year ago</th><th>BLS std. error</th></tr></thead><tbody></tbody></table></div>
+        <p class="hint" id="footnotes" style="margin-top:10px"></p>
+      </details>
+    </div>
+  </section>
+</main>
+<footer>Runs entirely in the browser. Data: U.S. Bureau of Labor Statistics, Current Population Survey, retrieved live from api.bls.gov. Standard errors are BLS's own, published from January 2026 data onward.</footer>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+// --- core start
+const SERIES = {
+  vet_sa: "LNS14049526", nonvet_sa: "LNS14049601",
+  women_vet: "LNU04049528", women_nonvet: "LNU04049603", men_vet: "LNU04049527", men_nonvet: "LNU04049602",
+  vet_nsa: "LNU04049526", nonvet_nsa: "LNU04049601",
+  white_vet: "LNU04049532", white_nonvet: "LNU04049607", black_vet: "LNU04049535", black_nonvet: "LNU04049610",
+  asian_vet: "LNU04049538", asian_nonvet: "LNU04049613", hisp_vet: "LNU04049529", hisp_nonvet: "LNU04049604"
+};
+const LABELS = {
+  vet_sa: "Veterans, seasonally adjusted", nonvet_sa: "Nonveterans, seasonally adjusted",
+  women_vet: "Women veterans", women_nonvet: "Women nonveterans", men_vet: "Men veterans", men_nonvet: "Men nonveterans",
+  vet_nsa: "Veterans, not seasonally adjusted", nonvet_nsa: "Nonveterans, not seasonally adjusted",
+  white_vet: "White veterans", white_nonvet: "White nonveterans", black_vet: "Black or African American veterans",
+  black_nonvet: "Black or African American nonveterans", asian_vet: "Asian veterans", asian_nonvet: "Asian nonveterans",
+  hisp_vet: "Hispanic or Latino veterans", hisp_nonvet: "Hispanic or Latino nonveterans"
+};
+const SEX_KEYS = ["women_vet", "women_nonvet", "men_vet", "men_nonvet"];
+const RACE_KEYS = ["white_vet", "white_nonvet", "black_vet", "black_nonvet", "asian_vet", "asian_nonvet", "hisp_vet", "hisp_nonvet"];
+const COLS = ["vet_disability", "nonvet_disability", "vet_no_disability", "nonvet_no_disability"];
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const KNOWN_GAPS = { "2025-10": "October 2025 data unavailable due to the 2025 lapse in appropriations." };
+const SCHEDULE = [{"date": "2026-10-02", "reference": "2026-09"}, {"date": "2026-11-06", "reference": "2026-10"}, {"date": "2026-12-04", "reference": "2026-11"}, {"date": "2027-01-08", "reference": "2026-12"}, {"date": "2027-02-05", "reference": "2027-01"}, {"date": "2027-03-05", "reference": "2027-02"}, {"date": "2027-04-02", "reference": "2027-03"}, {"date": "2027-05-07", "reference": "2027-04"}, {"date": "2027-06-04", "reference": "2027-05"}, {"date": "2027-07-02", "reference": "2027-06"}, {"date": "2027-08-06", "reference": "2027-07"}, {"date": "2027-09-03", "reference": "2027-08"}, {"date": "2027-10-08", "reference": "2027-09"}, {"date": "2027-11-05", "reference": "2027-10"}, {"date": "2027-12-03", "reference": "2027-11"}];
+const mkey = (y, m) => y + "-" + String(m).padStart(2, "0");
+const parseKey = k => k.split("-").map(Number);
+function shift(month, delta) { const i = month[0] * 12 + (month[1] - 1) + delta; return [Math.floor(i / 12), (i % 12) + 1]; }
+const monthName = m => MONTHS[m[1] - 1];
+const monthYear = m => MONTHS[m[1] - 1] + " " + m[0];
+const fmt = v => (v == null || isNaN(v)) ? "TBD" : v.toFixed(1);
+function parseSeries(s) {
+  const obs = {}, se = {}, notes = []; let latest = null;
+  for (const x of s.data || []) {
+    const p = x.period || ""; if (!p.startsWith("M") || p === "M13") continue;
+    const k = x.year + "-" + p.slice(1);
+    const raw = String(x.value == null ? "" : x.value).trim();
+    obs[k] = (raw === "" || raw === "-") ? null : parseFloat(raw);
+    if (String(x.latest).toLowerCase() === "true") latest = k;
+    for (const a of x.aspects || []) if (a && a.name === "Standard Error" && a.value) se[k] = parseFloat(a.value);
+    for (const f of x.footnotes || []) if (f && f.text && !notes.includes(f.text)) notes.push(f.text);
+  }
+  return { id: s.seriesID, title: (s.catalog || {}).series_title || null, obs, se, latest, notes };
+}
+function val(series, month) { const v = series.obs[mkey(month[0], month[1])]; return v === undefined ? null : v; }
+function latestCommonMonth(all) {
+  let common = null;
+  for (const s of Object.values(all)) {
+    const ms = new Set(Object.keys(s.obs).filter(k => s.obs[k] != null));
+    common = common ? new Set([...common].filter(k => ms.has(k))) : ms;
+  }
+  if (!common || !common.size) return null;
+  return parseKey([...common].sort().pop());
+}
+function commonMonths(all) {
+  let common = null;
+  for (const s of Object.values(all)) {
+    const ms = new Set(Object.keys(s.obs).filter(k => s.obs[k] != null));
+    common = common ? new Set([...common].filter(k => ms.has(k))) : ms;
+  }
+  return common ? [...common].sort().reverse() : [];
+}
+function previousAvailable(series, month, maxBack = 6) {
+  for (let b = 1; b <= maxBack; b++) { const c = shift(month, -b); const v = val(series, c); if (v != null) return { month: c, value: v, back: b }; }
+  return { month: null, value: null, back: 0 };
+}
+function comparePhrase(cur, prior, label) {
+  if (prior == null) return "[no " + label + " value available]";
+  if (cur > prior + 1e-9) return "up from " + prior.toFixed(1) + "% " + label;
+  if (cur < prior - 1e-9) return "down from " + prior.toFixed(1) + "% " + label;
+  return "unchanged from " + label;
+}
+function buildHeadline(vet, nonvet, month) {
+  const curV = val(vet, month), curN = val(nonvet, month);
+  if (curV == null || curN == null) throw new Error("No published headline values for " + monthYear(month));
+  const warnings = [];
+  const prev = previousAvailable(vet, month);
+  const prevN = prev.month ? val(nonvet, prev.month) : null;
+  let prevLabel = "the previous month";
+  if (!prev.month) warnings.push("No published data in the six months before " + monthYear(month) + ".");
+  else if (prev.back > 1) {
+    prevLabel = monthName(prev.month) + " (the last month with published data)";
+    warnings.push("No data for " + monthYear(shift(month, -1)) + "; compared with " + monthYear(prev.month) + " instead. Review the wording.");
+  }
+  const yearAgo = shift(month, -12);
+  const yrV = val(vet, yearAgo), yrN = val(nonvet, yearAgo);
+  if (yrV == null || yrN == null) warnings.push("No data for " + monthYear(yearAgo) + "; the prior-year comparison needs manual wording.");
+  return {
+    vetRate: curV, nonvetRate: curN,
+    headline: "Veteran Unemployment Rate was " + curV.toFixed(1) + "% in " + monthName(month),
+    vetSentence: "In " + monthYear(month) + ", the veteran unemployment rate was " + curV.toFixed(1) + "%, " + comparePhrase(curV, prev.value, prevLabel) + " and " + comparePhrase(curV, yrV, "the prior year") + ".",
+    nonvetSentence: "Also in " + monthYear(month) + ", the comparable non-veteran unemployment rate was " + curN.toFixed(1) + "%, " + comparePhrase(curN, prevN, prevLabel) + " and " + comparePhrase(curN, yrN, "the prior year") + ".",
+    warnings
+  };
+}
+function movingAverage(rows, end, window = 12) {
+  const months = []; for (let i = window - 1; i >= 0; i--) months.push(shift(end, -i));
+  const has = m => { const r = rows[mkey(m[0], m[1])]; return !!r && COLS.every(c => r[c] != null && !isNaN(r[c])); };
+  const complete = months.filter(has);
+  if (!has(end)) return { error: "No complete Table 16 row for " + monthYear(end) + "; the disability block shows TBD." };
+  const missing = months.filter(m => !has(m));
+  const values = {}; for (const c of COLS) values[c] = complete.reduce((a, m) => a + rows[mkey(m[0], m[1])][c], 0) / complete.length;
+  const warnings = missing.filter(m => !KNOWN_GAPS[mkey(m[0], m[1])]).map(m => monthYear(m) + " is missing from the Table 16 rows and is not a known survey gap; confirm.");
+  const note = missing.length ? " (" + missing.map(m => KNOWN_GAPS[mkey(m[0], m[1])] || (monthYear(m) + " data unavailable.")).join(" ") + ")" : "";
+  return { values, n: complete.length, window, start: complete[0], end: complete[complete.length - 1], missing, warnings, note };
+}
+// --- core end
+
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const LINKS = {
+  sa: "https://data.bls.gov/timeseries/LNS14049526&series_id=LNS14049601",
+  cps: "https://www.bls.gov/cps/",
+  disab: "https://www.dol.gov/agencies/vets/disabled-veterans/data-research",
+  sex: "https://data.bls.gov/timeseries/LNU04049528&series_id=LNU04049603&series_id=LNU04049527&series_id=LNU04049602",
+  race: "https://data.bls.gov/timeseries/LNU04049526&series_id=LNU04049601&series_id=LNU04049532&series_id=LNU04049607&series_id=LNU04049535&series_id=LNU04049610&series_id=LNU04049538&series_id=LNU04049613&series_id=LNU04049529&series_id=LNU04049604"
+};
+const F = "font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:11pt;color:#000000;";
+const P = (inner) => '<p style="' + F + 'margin:0 0 10pt">' + inner + "</p>";
+const A = (href, text) => '<a href="' + esc(href) + '" style="color:#0563C1">' + esc(text) + "</a>";
+function emailTable(title, groups, values) {
+  // groups: [{name, span}], sub-headers Veterans/Nonveterans per group, values in order
+  const td = (txt, extra) => '<td ' + (extra || "") + ' style="' + F + 'border:1px solid #808080;padding:3pt 6pt;text-align:center">' + txt + "</td>";
+  const th = (txt, extra) => '<th ' + (extra || "") + ' style="' + F + 'border:1px solid #808080;padding:3pt 6pt;text-align:center;font-weight:bold" bgcolor="#D9E2F3">' + txt + "</th>";
+  const cols = groups.reduce((a, g) => a + g.span, 0);
+  let h = '<table border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:1px solid #808080;margin:0 0 14pt">';
+  h += "<tr>" + th(esc(title), 'colspan="' + cols + '" scope="colgroup"') + "</tr>";
+  h += "<tr>" + groups.map(g => th(esc(g.name), 'colspan="' + g.span + '" scope="colgroup"')).join("") + "</tr>";
+  h += "<tr>" + groups.map(() => th("Veterans", 'scope="col"') + th("Nonveterans", 'scope="col"')).join("") + "</tr>";
+  h += "<tr>" + values.map(v => td(esc(v))).join("") + "</tr>";
+  return h + "</table>";
+}
+function renderEmail(m) {
+  const d = m.disab;
+  const n = d ? String(d.n) : "12";
+  let h = "";
+  h += P("Please see the full compilation of " + esc(m.monthYear) + " Numbers Day unemployment rates by veteran status below. " + (m.note ? esc(m.note) + " " : "") + "Please let me know if you have any questions.");
+  h += P("<b>" + esc(m.headline) + "</b>");
+  h += P(esc(m.vetSentence));
+  h += P(esc(m.nonvetSentence));
+  h += P("The " + A(LINKS.sa, "unemployment rates") + " are seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population. " + A(LINKS.cps, "Source: bls.gov (Current Population Survey)"));
+  h += P("<b>By Disability Status and Veteran Status</b>");
+  h += P("Unemployment Rates by " + A(LINKS.disab, "Disability Status and Veteran Status") + ", " + esc(d ? monthYear(d.start) : "TBD") + " – " + esc(d ? monthYear(d.end) : "TBD") + " Averaged * " + A(LINKS.cps, "Source: Current Population Survey") +
+       "*" + esc(n) + "-month moving average generated using unpublished data tables from the Disability package obtained from the U.S. Bureau of Labor Statistics: Table 16. Employment status of persons 18 years and over by veteran status, period of service, sex, race, Hispanic or Latino ethnicity, and disability status. The unemployment rates are not seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population." + esc(d ? d.note : ""));
+  h += emailTable("CALCULATIONS FOR " + n + "-Month Moving Average - Unemployment Rates by Disability Status and Veteran Status",
+    [{ name: "Persons with a Disability", span: 2 }, { name: "Persons with no Disability", span: 2 }],
+    COLS.map(c => d ? fmt(d.values[c]) : "TBD"));
+  h += P("<b>By Sex and Veteran Status</b>");
+  h += P("Unemployment Rates by " + A(LINKS.sex, "Sex and Veteran Status") + ". The unemployment rates are not seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population. " + A(LINKS.cps, "Source: bls.gov (Current Population Survey)"));
+  h += emailTable("Unemployment Rates by Sex and Veteran Status", [{ name: "Women", span: 2 }, { name: "Men", span: 2 }], SEX_KEYS.map(k => fmt(m.rates[k])));
+  h += P("<b>By Race, Hispanic or Latino Ethnicity, and Veteran status</b>");
+  h += P("Unemployment Rates by " + A(LINKS.race, "Race, Hispanic or Latino Ethnicity, and Veteran Status") + ". The unemployment rates are not seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population. " + A(LINKS.cps, "Source: bls.gov (Current Population Survey)"));
+  h += emailTable("Unemployment Rates by Race, Hispanic or Latino Ethnicity, and Veteran status",
+    [{ name: "White", span: 2 }, { name: "Black or African American", span: 2 }, { name: "Asian", span: 2 }, { name: "Hispanic or Latino", span: 2 }],
+    RACE_KEYS.map(k => fmt(m.rates[k])));
+  return h;
+}
+function renderText(m) {
+  const d = m.disab, n = d ? String(d.n) : "12";
+  const L = [];
+  L.push("Please see the full compilation of " + m.monthYear + " Numbers Day unemployment rates by veteran status below. " + (m.note ? m.note + " " : "") + "Please let me know if you have any questions.", "");
+  L.push(m.headline, "", m.vetSentence, "", m.nonvetSentence, "");
+  L.push("The unemployment rates are seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population. Source: bls.gov (Current Population Survey) " + LINKS.cps, "");
+  L.push("BY DISABILITY STATUS AND VETERAN STATUS");
+  L.push("Unemployment Rates by Disability Status and Veteran Status, " + (d ? monthYear(d.start) : "TBD") + " – " + (d ? monthYear(d.end) : "TBD") + " Averaged* (" + n + "-month moving average, unpublished BLS Table 16, not seasonally adjusted)" + (d ? d.note : ""));
+  L.push("Veterans with a disability " + (d ? fmt(d.values.vet_disability) : "TBD") + "%, Nonveterans with a disability " + (d ? fmt(d.values.nonvet_disability) : "TBD") + "%, Veterans with no disability " + (d ? fmt(d.values.vet_no_disability) : "TBD") + "%, Nonveterans with no disability " + (d ? fmt(d.values.nonvet_no_disability) : "TBD") + "%.", "");
+  L.push("BY SEX AND VETERAN STATUS (not seasonally adjusted)");
+  L.push("Women veterans " + fmt(m.rates.women_vet) + "%, Women nonveterans " + fmt(m.rates.women_nonvet) + "%, Men veterans " + fmt(m.rates.men_vet) + "%, Men nonveterans " + fmt(m.rates.men_nonvet) + "%.", "");
+  L.push("BY RACE, HISPANIC OR LATINO ETHNICITY, AND VETERAN STATUS (not seasonally adjusted)");
+  L.push("White veterans " + fmt(m.rates.white_vet) + "%, White nonveterans " + fmt(m.rates.white_nonvet) + "%, Black or African American veterans " + fmt(m.rates.black_vet) + "%, Black or African American nonveterans " + fmt(m.rates.black_nonvet) + "%, Asian veterans " + fmt(m.rates.asian_vet) + "%, Asian nonveterans " + fmt(m.rates.asian_nonvet) + "%, Hispanic or Latino veterans " + fmt(m.rates.hisp_vet) + "%, Hispanic or Latino nonveterans " + fmt(m.rates.hisp_nonvet) + "%.");
+  L.push("", "Source: bls.gov (Current Population Survey) " + LINKS.cps);
+  return L.join("\n");
+}
+
+// ----- storage -----
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("numbersday." + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("numbersday." + k, JSON.stringify(v)); } catch (e) {} }
+};
+const $ = id => document.getElementById(id);
+let state = { data: null, model: null, audit: null, example: true };
+
+// ----- example shown before the first build (the September 2026 compilation) -----
+const EXAMPLE = {
+  month: [2026, 9], monthYear: "September 2026", note: "",
+  headline: "Veteran Unemployment Rate was 3.6% in September",
+  vetSentence: "In September 2026, the veteran unemployment rate was 3.6%, up from 3.5% the previous month and up from 2.7% the prior year.",
+  nonvetSentence: "Also in September 2026, the comparable non-veteran unemployment rate was 4.0%, unchanged from the previous month and down from 4.4% the prior year.",
+  rates: { women_vet: 6.1, women_nonvet: 3.8, men_vet: 3.0, men_nonvet: 4.0, white_vet: 2.7, white_nonvet: 3.3, black_vet: 5.7, black_nonvet: 6.6, asian_vet: 6.8, asian_nonvet: 2.8, hisp_vet: 4.1, hisp_nonvet: 4.3 },
+  disab: { values: { vet_disability: 6.5, nonvet_disability: 7.9, vet_no_disability: 3.4, nonvet_no_disability: 4.0 }, n: 11, window: 12, start: [2025, 11], end: [2026, 9], missing: [[2025, 10]], note: " (October 2025 data unavailable due to the 2025 lapse in appropriations.)" }
+};
+
+// ----- UI helpers -----
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), 2600); }
+function setAlerts(items) {
+  $("alerts").innerHTML = items.map(a => '<div class="alert ' + a.kind + '">' + esc(a.text) + "</div>").join("");
+}
+function subjectFor(m) { const tpl = $("subject").dataset.template || "Numbers Day - {month_year}"; return tpl.replace("{month_year}", m.monthYear).replace("{month}", monthName(m.month)); }
+function showModel(m, example) {
+  state.model = m; state.example = example;
+  $("email").innerHTML = renderEmail(m);
+  $("badge").textContent = example ? "Example: " + m.monthYear : "Built " + new Date().toLocaleString() + " · " + m.monthYear;
+  $("badge").classList.toggle("live", !example);
+  if (!$("subject").dataset.edited) $("subject").value = subjectFor(m);
+}
+function nextRelease() {
+  const today = new Date(); const t = mkey(today.getFullYear(), today.getMonth() + 1) + "-" + String(today.getDate()).padStart(2, "0");
+  return SCHEDULE.find(r => r.date >= t) || null;
+}
+function renderSchedulePill() {
+  const r = nextRelease();
+  if (!r) { $("pillNext").textContent = "Release schedule needs updating"; return; }
+  const d = new Date(r.date + "T12:00:00");
+  const ref = parseKey(r.reference);
+  $("pillNext").innerHTML = "Next release: <b>" + esc(d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })) + ", 8:30 ET</b> (" + esc(monthYear(ref) + " data") + ")";
+}
+
+// ----- disability rows -----
+function getRows() { return store.get("disability", []); }
+function setRows(rows) { store.set("disability", rows); renderRows(); }
+function renderRows() {
+  const rows = getRows().slice().sort((a, b) => a.month < b.month ? -1 : 1);
+  const tb = $("disabTable").querySelector("tbody");
+  tb.innerHTML = rows.map((r, i) => "<tr>" +
+    '<td><input type="text" aria-label="Month" value="' + esc(r.month) + '" data-i="' + i + '" data-f="month" placeholder="2026-09"></td>' +
+    COLS.map(c => '<td><input type="text" inputmode="decimal" aria-label="' + c + '" value="' + esc(r[c] == null ? "" : r[c]) + '" data-i="' + i + '" data-f="' + c + '"></td>').join("") +
+    '<td><button class="btn small" type="button" data-del="' + i + '" aria-label="Remove row">×</button></td></tr>').join("");
+  tb.querySelectorAll("input").forEach(inp => inp.addEventListener("change", e => {
+    const all = getRows().slice().sort((a, b) => a.month < b.month ? -1 : 1);
+    const r = all[+e.target.dataset.i]; const f = e.target.dataset.f;
+    r[f] = f === "month" ? e.target.value.trim() : (e.target.value.trim() === "" ? null : parseFloat(e.target.value));
+    setRows(all);
+  }));
+  tb.querySelectorAll("button[data-del]").forEach(b => b.addEventListener("click", e => { const all = getRows().slice().sort((a, b) => a.month < b.month ? -1 : 1); all.splice(+e.target.dataset.del, 1); setRows(all); }));
+  $("disabHint").textContent = rows.length ? rows.length + " month" + (rows.length === 1 ? "" : "s") + " stored, " + rows[0].month + " to " + rows[rows.length - 1].month + "." : "No rows yet. The disability block will show TBD until the reference month's row exists.";
+}
+function rowsAsMap() { const m = {}; for (const r of getRows()) if (/^\d{4}-\d{2}$/.test(r.month)) m[r.month] = r; return m; }
+$("addRow").addEventListener("click", () => {
+  const rows = getRows(); let next;
+  if (rows.length) { const last = rows.map(r => r.month).sort().pop(); const [y, mo] = parseKey(last); const n = shift([y, mo], 1); next = mkey(n[0], n[1]); }
+  else { const t = new Date(); next = mkey(t.getFullYear(), t.getMonth() + 1); }
+  rows.push({ month: next, vet_disability: null, nonvet_disability: null, vet_no_disability: null, nonvet_no_disability: null });
+  setRows(rows);
+});
+$("clearRows").addEventListener("click", () => { if (getRows().length && $("clearRows").dataset.armed) { setRows([]); delete $("clearRows").dataset.armed; $("clearRows").textContent = "Clear"; } else { $("clearRows").dataset.armed = "1"; $("clearRows").textContent = "Click again to clear"; setTimeout(() => { delete $("clearRows").dataset.armed; $("clearRows").textContent = "Clear"; }, 3000); } });
+$("csvFile").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const lines = String(reader.result).replace(/^﻿/, "").split(/\r?\n/).filter(l => l.trim());
+    const head = lines.shift().split(",").map(s => s.trim().toLowerCase());
+    const idx = n => head.indexOf(n);
+    if (["month", ...COLS].some(c => idx(c) < 0)) { toast("CSV needs columns: month," + COLS.join(",")); return; }
+    const rows = getRows(); const byMonth = {}; rows.forEach(r => byMonth[r.month] = r);
+    for (const l of lines) {
+      const c = l.split(",").map(s => s.trim());
+      const r = { month: c[idx("month")] };
+      for (const col of COLS) { const v = (c[idx(col)] || "").toLowerCase(); r[col] = (v === "" || v === "-" || v === "na" || v === "n/a") ? null : parseFloat(v); }
+      byMonth[r.month] = r;
+    }
+    setRows(Object.values(byMonth)); toast("Imported " + lines.length + " rows");
+  };
+  reader.readAsText(f); e.target.value = "";
+});
+
+// ----- key -----
+$("apiKey").value = store.get("key", "");
+function keyStatus() { $("keyStatus").textContent = store.get("key", "") ? "Saved in this browser." : "No key saved. Without one, BLS allows 25 requests a day for the whole network; a build needs 16."; }
+keyStatus();
+$("saveKey").addEventListener("click", () => { store.set("key", $("apiKey").value.trim()); keyStatus(); toast("Key saved in this browser"); });
+$("toggleKey").addEventListener("click", () => { const i = $("apiKey"); i.type = i.type === "password" ? "text" : "password"; $("toggleKey").textContent = i.type === "password" ? "Show" : "Hide"; });
+$("note").value = store.get("note", "");
+$("note").addEventListener("change", () => store.set("note", $("note").value));
+$("subject").dataset.template = store.get("subjectTemplate", "Numbers Day - {month_year}");
+$("subject").addEventListener("change", () => { $("subject").dataset.edited = "1"; });
+
+// ----- fetch and build -----
+async function getJson(url, attempts = 2) {
+  let last;
+  for (let i = 0; i < attempts; i++) {
+    try { const r = await fetch(url, { cache: "no-store" }); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); }
+    catch (e) { last = e; await new Promise(res => setTimeout(res, 1500)); }
+  }
+  throw last;
+}
+async function fetchAll(apiKey, endYear) {
+  const start = endYear - 2, out = {}, messages = [];
+  await Promise.all(Object.entries(SERIES).map(async ([role, id]) => {
+    const q = new URLSearchParams({ startyear: String(start), endyear: String(endYear) });
+    if (apiKey) { q.set("registrationkey", apiKey); q.set("catalog", "true"); q.set("aspects", "true"); }
+    const body = await getJson("https://api.bls.gov/publicAPI/v2/timeseries/data/" + id + "?" + q.toString());
+    if (body.status !== "REQUEST_SUCCEEDED") throw new Error("BLS API " + body.status + ": " + (body.message || []).join("; "));
+    const s = ((body.Results || {}).series || [])[0];
+    if (!s || !s.data || !s.data.length) throw new Error("BLS API returned no data for " + id + (body.message && body.message.length ? " (" + body.message.join("; ") + ")" : ""));
+    out[role] = parseSeries(s);
+    for (const m of body.message || []) if (!/aspect|catalog/i.test(m) && !messages.includes(m)) messages.push(m);
+  }));
+  return { data: out, messages };
+}
+function buildModel(data, month, rows, note) {
+  const head = buildHeadline(data.vet_sa, data.nonvet_sa, month);
+  const warnings = head.warnings.slice();
+  const latestFlag = data.vet_sa.latest ? parseKey(data.vet_sa.latest) : null;
+  const common = latestCommonMonth(data);
+  if (latestFlag && common && mkey(latestFlag[0], latestFlag[1]) !== mkey(common[0], common[1])) warnings.push("Series disagree on the latest month (headline series: " + monthYear(latestFlag) + "). The API may be mid-update; rebuild in a few minutes.");
+  let disab = null;
+  const ma = movingAverage(rows, month);
+  if (ma.error) warnings.push(ma.error); else { disab = ma; warnings.push(...ma.warnings); }
+  const rates = {}; for (const k of [...SEX_KEYS, ...RACE_KEYS]) rates[k] = val(data[k], month);
+  const prev = shift(month, -1), yr = shift(month, -12);
+  const audit = {
+    generated: new Date().toISOString(), source: "VETS Numbers Day portal", reference_month: mkey(month[0], month[1]),
+    text: { headline: head.headline, vet_sentence: head.vetSentence, nonvet_sentence: head.nonvetSentence },
+    rates: Object.fromEntries(Object.keys(SERIES).map(role => [role, { series_id: SERIES[role], label: LABELS[role], title: data[role].title, value: val(data[role], month), previous_month: val(data[role], prev), year_ago: val(data[role], yr), standard_error: data[role].se[mkey(month[0], month[1])] ?? null }])),
+    disability: disab ? { values: Object.fromEntries(COLS.map(c => [c, Math.round(disab.values[c] * 100) / 100])), months_averaged: disab.n, window: disab.window, start: monthYear(disab.start), end: monthYear(disab.end), missing: disab.missing.map(monthYear) } : null,
+    api_footnotes: [...new Set(Object.values(data).flatMap(s => s.notes))].sort(),
+    warnings
+  };
+  return { model: { month, monthYear: monthYear(month), note: (note || "").trim(), headline: head.headline, vetSentence: head.vetSentence, nonvetSentence: head.nonvetSentence, rates, disab }, audit, warnings };
+}
+function renderNumbers(data, month, audit) {
+  const tb = $("numbersTable").querySelector("tbody");
+  tb.innerHTML = Object.keys(SERIES).map(role => { const r = audit.rates[role]; return "<tr><td>" + esc(LABELS[role]) + '</td><td class="id">' + esc(r.series_id) + "</td><td>" + esc(fmt(r.value)) + "</td><td>" + esc(fmt(r.previous_month)) + "</td><td>" + esc(fmt(r.year_ago)) + "</td><td>" + esc(r.standard_error == null ? "–" : r.standard_error.toFixed(2)) + "</td></tr>"; }).join("");
+  $("footnotes").textContent = audit.api_footnotes.length ? "BLS footnotes: " + audit.api_footnotes.join(" ") : "";
+}
+function fillMonthSelect(data, chosen) {
+  const sel = $("month"); const keep = chosen || "";
+  sel.innerHTML = '<option value="">Latest published (default)</option>' + commonMonths(data).slice(0, 36).map(k => { const m = parseKey(k); return '<option value="' + k + '">' + esc(monthYear(m)) + "</option>"; }).join("");
+  sel.value = keep;
+}
+async function build() {
+  const btn = $("build"); btn.disabled = true; $("buildStatus").textContent = "Fetching 16 series from api.bls.gov…"; setAlerts([]);
+  const apiKey = store.get("key", "") || $("apiKey").value.trim();
+  try {
+    const endYear = new Date().getFullYear();
+    const { data, messages } = await fetchAll(apiKey, endYear);
+    const chosen = $("month").value;
+    const month = chosen ? parseKey(chosen) : latestCommonMonth(data);
+    if (!month) throw new Error("The API returned no month with values for every series.");
+    if (chosen && Object.values(data).some(s => val(s, month) == null)) throw new Error("No published values for " + monthYear(month) + " yet.");
+    store.set("note", $("note").value);
+    const { model, audit, warnings } = buildModel(data, month, rowsAsMap(), $("note").value);
+    state.data = data; state.audit = audit;
+    delete $("subject").dataset.edited;
+    showModel(model, false);
+    fillMonthSelect(data, chosen);
+    renderNumbers(data, month, audit);
+    const latest = latestCommonMonth(data); $("pillLatest").innerHTML = "Latest published: <b>" + esc(monthYear(latest)) + "</b>";
+    const alerts = warnings.map(w => ({ kind: "warn", text: w })).concat(messages.map(m => ({ kind: "warn", text: "BLS API: " + m })));
+    alerts.unshift({ kind: "ok", text: "Built " + monthYear(month) + " from live BLS data. Review the text, then copy it into a new Outlook message." });
+    setAlerts(alerts);
+    $("buildStatus").textContent = "Done.";
+  } catch (e) {
+    let msg = String(e && e.message || e); if (apiKey) msg = msg.split(apiKey).join("***");
+    setAlerts([{ kind: "err", text: "Build failed: " + msg + (/HTTP|fetch|network/i.test(msg) ? " If this page is open from a DOL network, check that api.bls.gov is reachable in this browser." : "") }]);
+    $("buildStatus").textContent = "";
+  } finally { btn.disabled = false; }
+}
+$("build").addEventListener("click", build);
+
+// ----- copy -----
+async function copyRich(html, text) {
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([html], { type: "text/html" }), "text/plain": new Blob([text], { type: "text/plain" }) })]);
+      return true;
+    }
+  } catch (e) {}
+  const node = $("email"); const range = document.createRange(); range.selectNodeContents(node);
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  let ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+  sel.removeAllRanges(); return ok;
+}
+async function copyPlain(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+  const ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select();
+  let ok = false; try { ok = document.execCommand("copy"); } catch (e) {} document.body.removeChild(ta); return ok;
+}
+$("copyEmail").addEventListener("click", async () => {
+  const html = '<html><body style="' + F + '">' + renderEmail(state.model) + "</body></html>";
+  const ok = await copyRich(html, renderText(state.model));
+  toast(ok ? "Email copied. Paste into a new Outlook message." : "Copy was blocked. Select the email body and copy it by hand.");
+});
+$("copyText").addEventListener("click", async () => { toast((await copyPlain(renderText(state.model))) ? "Plain text copied." : "Copy was blocked."); });
+$("copySubject").addEventListener("click", async () => { toast((await copyPlain($("subject").value)) ? "Subject copied." : "Copy was blocked."); });
+function auditText() { return JSON.stringify(state.audit || { example: true, note: "Build the email first; this is the example compilation.", model: state.model }, null, 2); }
+$("copyJson").addEventListener("click", async () => { toast((await copyPlain(auditText())) ? "Audit JSON copied." : "Copy was blocked."); });
+$("downloadJson").addEventListener("click", () => {
+  const blob = new Blob([auditText()], { type: "application/json" }); const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "Numbers Day " + (state.model ? state.model.monthYear : "example") + ".json"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+// ----- boot -----
+renderSchedulePill();
+renderRows();
+showModel(EXAMPLE, true);
+setAlerts([{ kind: "warn", text: "This is the September 2026 example until you build. Save your key, add the Table 16 rows, then press Build." }]);
+</script>
+</body>
+</html>
