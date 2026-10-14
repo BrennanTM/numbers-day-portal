@@ -68,7 +68,9 @@ textarea { min-height: 64px; resize: vertical; }
 table.rows { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 table.rows th, table.rows td { padding: 4px 4px; border-bottom: 1px solid var(--line); text-align: left; }
 table.rows th { font-weight: 600; color: var(--muted); font-size: 12px; }
-table.rows input { width: 100%; padding: 4px 6px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); font-family: var(--mono); font-size: 13px; }
+table.rows input { width: 100%; min-width: 44px; padding: 4px 5px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); font-family: var(--mono); font-size: 12px; }
+table.rows td:first-child input { min-width: 76px; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--fg); text-decoration: underline; cursor: pointer; font-size: 13px; }
 .scroll { overflow-x: auto; }
 .drop { border: 2px dashed var(--line-strong); border-radius: var(--radius); padding: 12px 14px; text-align: center; color: var(--muted); font-size: 14px; margin-bottom: 10px; }
 .drop.over { border-color: var(--accent); background: var(--accent-soft); }
@@ -158,7 +160,7 @@ footer { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block:
 
     <div class="card">
       <button class="btn primary big" type="button" id="build">Build this month's email</button>
-      <p class="hint" style="margin:10px 0 0">Makes 16 requests to api.bls.gov. Nothing else leaves this page.</p>
+      <p class="hint" style="margin:10px 0 0">Makes 32 requests to api.bls.gov (16 unemployment series, 16 participation series). Nothing else leaves this page.</p>
       <div class="hint" id="buildStatus" aria-live="polite"></div>
     </div>
   </section>
@@ -207,7 +209,12 @@ const SERIES = {
   women_vet: "LNU04049528", women_nonvet: "LNU04049603", men_vet: "LNU04049527", men_nonvet: "LNU04049602",
   vet_nsa: "LNU04049526", nonvet_nsa: "LNU04049601",
   white_vet: "LNU04049532", white_nonvet: "LNU04049607", black_vet: "LNU04049535", black_nonvet: "LNU04049610",
-  asian_vet: "LNU04049538", asian_nonvet: "LNU04049613", hisp_vet: "LNU04049529", hisp_nonvet: "LNU04049604"
+  asian_vet: "LNU04049538", asian_nonvet: "LNU04049613", hisp_vet: "LNU04049529", hisp_nonvet: "LNU04049604",
+  lfpr_vet_sa: "LNS11349526", lfpr_nonvet_sa: "LNS11349601",
+  lfpr_women_vet: "LNU01349528", lfpr_women_nonvet: "LNU01349603", lfpr_men_vet: "LNU01349527", lfpr_men_nonvet: "LNU01349602",
+  lfpr_vet_nsa: "LNU01349526", lfpr_nonvet_nsa: "LNU01349601",
+  lfpr_white_vet: "LNU01349532", lfpr_white_nonvet: "LNU01349607", lfpr_black_vet: "LNU01349535", lfpr_black_nonvet: "LNU01349610",
+  lfpr_asian_vet: "LNU01349538", lfpr_asian_nonvet: "LNU01349613", lfpr_hisp_vet: "LNU01349529", lfpr_hisp_nonvet: "LNU01349604"
 };
 const LABELS = {
   vet_sa: "Veterans, seasonally adjusted", nonvet_sa: "Nonveterans, seasonally adjusted",
@@ -217,8 +224,10 @@ const LABELS = {
   black_nonvet: "Black or African American nonveterans", asian_vet: "Asian veterans", asian_nonvet: "Asian nonveterans",
   hisp_vet: "Hispanic or Latino veterans", hisp_nonvet: "Hispanic or Latino nonveterans"
 };
+for (const k of Object.keys(LABELS)) LABELS["lfpr_" + k] = "Participation rate: " + LABELS[k];
 const SEX_KEYS = ["women_vet", "women_nonvet", "men_vet", "men_nonvet"];
 const RACE_KEYS = ["white_vet", "white_nonvet", "black_vet", "black_nonvet", "asian_vet", "asian_nonvet", "hisp_vet", "hisp_nonvet"];
+const LFPR_SEX_KEYS = SEX_KEYS.map(k => "lfpr_" + k), LFPR_RACE_KEYS = RACE_KEYS.map(k => "lfpr_" + k);
 const COLS = ["vet_disability", "nonvet_disability", "vet_no_disability", "nonvet_no_disability"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const KNOWN_GAPS = { "2025-10": "October 2025 data unavailable due to the 2025 lapse in appropriations." };
@@ -293,6 +302,24 @@ function buildHeadline(vet, nonvet, month) {
     warnings
   };
 }
+function buildParticipation(vet, nonvet, month) {
+  const curV = val(vet, month), curN = val(nonvet, month);
+  if (curV == null || curN == null) throw new Error("No published participation rates for " + monthYear(month));
+  const warnings = [];
+  const prev = previousAvailable(vet, month);
+  const prevN = prev.month ? val(nonvet, prev.month) : null;
+  let prevLabel = "the previous month";
+  if (!prev.month) warnings.push("No published participation data in the six months before " + monthYear(month) + ".");
+  else if (prev.back > 1) prevLabel = monthName(prev.month) + " (the last month with published data)";
+  const yearAgo = shift(month, -12);
+  const yrV = val(vet, yearAgo), yrN = val(nonvet, yearAgo);
+  if (yrV == null || yrN == null) warnings.push("No participation data for " + monthYear(yearAgo) + "; the prior-year comparison needs manual wording.");
+  return {
+    vetRate: curV, nonvetRate: curN, warnings,
+    vetSentence: "The veteran labor force participation rate was " + curV.toFixed(1) + "% in " + monthYear(month) + ", " + comparePhrase(curV, prev.value, prevLabel) + " and " + comparePhrase(curV, yrV, "the prior year") + ".",
+    nonvetSentence: "The comparable non-veteran participation rate was " + curN.toFixed(1) + "%, " + comparePhrase(curN, prevN, prevLabel) + " and " + comparePhrase(curN, yrN, "the prior year") + "."
+  };
+}
 function movingAverage(rows, end, window = 12) {
   const months = []; for (let i = window - 1; i >= 0; i--) months.push(shift(end, -i));
   const has = m => { const r = rows[mkey(m[0], m[1])]; return !!r && COLS.every(c => r[c] != null && !isNaN(r[c])); };
@@ -308,25 +335,28 @@ function movingAverage(rows, end, window = 12) {
 
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const LINKS = {
-  sa: "https://data.bls.gov/timeseries/LNS14049526&series_id=LNS14049601",
+  sa: "https://data.bls.gov/timeseries/LNS14049526&series_id=LNS14049601&series_id=LNS11349526&series_id=LNS11349601",
   cps: "https://www.bls.gov/cps/",
   disab: "https://www.dol.gov/agencies/vets/disabled-veterans/data-research",
-  sex: "https://data.bls.gov/timeseries/LNU04049528&series_id=LNU04049603&series_id=LNU04049527&series_id=LNU04049602",
-  race: "https://data.bls.gov/timeseries/LNU04049526&series_id=LNU04049601&series_id=LNU04049532&series_id=LNU04049607&series_id=LNU04049535&series_id=LNU04049610&series_id=LNU04049538&series_id=LNU04049613&series_id=LNU04049529&series_id=LNU04049604"
+  sex: "https://data.bls.gov/timeseries/LNU04049528&series_id=LNU04049603&series_id=LNU04049527&series_id=LNU04049602&series_id=LNU01349528&series_id=LNU01349603&series_id=LNU01349527&series_id=LNU01349602",
+  race: "https://data.bls.gov/timeseries/LNU04049526&series_id=LNU04049601&series_id=LNU04049532&series_id=LNU04049607&series_id=LNU04049535&series_id=LNU04049610&series_id=LNU04049538&series_id=LNU04049613&series_id=LNU04049529&series_id=LNU04049604&series_id=LNU01349532&series_id=LNU01349607&series_id=LNU01349535&series_id=LNU01349610&series_id=LNU01349538&series_id=LNU01349613&series_id=LNU01349529&series_id=LNU01349604"
 };
 const F = "font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:11pt;color:#000000;";
 const P = (inner) => '<p style="' + F + 'margin:0 0 10pt">' + inner + "</p>";
 const A = (href, text) => '<a href="' + esc(href) + '" style="color:#0563C1">' + esc(text) + "</a>";
-function emailTable(title, groups, values) {
-  // groups: [{name, span}], sub-headers Veterans/Nonveterans per group, values in order
+function emailTable(title, groups, rows) {
+  // rows: [{label, values}]; one row renders as before, several get a labelled band above each
   const td = (txt, extra) => '<td ' + (extra || "") + ' style="' + F + 'border:1px solid #808080;padding:3pt 6pt;text-align:center">' + txt + "</td>";
-  const th = (txt, extra) => '<th ' + (extra || "") + ' style="' + F + 'border:1px solid #808080;padding:3pt 6pt;text-align:center;font-weight:bold" bgcolor="#D9E2F3">' + txt + "</th>";
+  const th = (txt, extra, fill) => '<th ' + (extra || "") + ' style="' + F + 'border:1px solid #808080;padding:3pt 6pt;text-align:center;font-weight:bold" bgcolor="' + (fill || "#D9E2F3") + '">' + txt + "</th>";
   const cols = groups.reduce((a, g) => a + g.span, 0);
   let h = '<table border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:1px solid #808080;margin:0 0 14pt">';
   h += "<tr>" + th(esc(title), 'colspan="' + cols + '" scope="colgroup"') + "</tr>";
   h += "<tr>" + groups.map(g => th(esc(g.name), 'colspan="' + g.span + '" scope="colgroup"')).join("") + "</tr>";
   h += "<tr>" + groups.map(() => th("Veterans", 'scope="col"') + th("Nonveterans", 'scope="col"')).join("") + "</tr>";
-  h += "<tr>" + values.map(v => td(esc(v))).join("") + "</tr>";
+  for (const r of rows) {
+    if (rows.length > 1) h += "<tr>" + th(esc(r.label), 'colspan="' + cols + '" scope="colgroup"', "#EDF2F9") + "</tr>";
+    h += "<tr>" + r.values.map(v => td(esc(v))).join("") + "</tr>";
+  }
   return h + "</table>";
 }
 function renderEmail(m) {
@@ -337,21 +367,23 @@ function renderEmail(m) {
   h += P("<b>" + esc(m.headline) + "</b>");
   h += P(esc(m.vetSentence));
   h += P(esc(m.nonvetSentence));
-  h += P("The " + A(LINKS.sa, "unemployment rates") + " are seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population. " + A(LINKS.cps, "Source: bls.gov (Current Population Survey)"));
+  if (m.lfprVetSentence) h += P(esc(m.lfprVetSentence) + " " + esc(m.lfprNonvetSentence));
+  h += P("The " + A(LINKS.sa, "unemployment and labor force participation rates") + " are seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population. " + A(LINKS.cps, "Source: bls.gov (Current Population Survey)"));
   h += P("<b>By Disability Status and Veteran Status</b>");
   h += P("Unemployment Rates by " + A(LINKS.disab, "Disability Status and Veteran Status") + ", " + esc(d ? monthYear(d.start) : "TBD") + " – " + esc(d ? monthYear(d.end) : "TBD") + " Averaged * " + A(LINKS.cps, "Source: Current Population Survey") +
        "*" + esc(n) + "-month moving average generated using unpublished data tables from the Disability package obtained from the U.S. Bureau of Labor Statistics: Table 16. Employment status of persons 18 years and over by veteran status, period of service, sex, race, Hispanic or Latino ethnicity, and disability status. The unemployment rates are not seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population." + esc(d ? d.note : ""));
   h += emailTable("CALCULATIONS FOR " + n + "-Month Moving Average - Unemployment Rates by Disability Status and Veteran Status",
     [{ name: "Persons with a Disability", span: 2 }, { name: "Persons with no Disability", span: 2 }],
-    COLS.map(c => d ? fmt(d.values[c]) : "TBD"));
+    [{ label: "Unemployment rates", values: COLS.map(c => d ? fmt(d.values[c]) : "TBD") }]);
   h += P("<b>By Sex and Veteran Status</b>");
-  h += P("Unemployment Rates by " + A(LINKS.sex, "Sex and Veteran Status") + ". The unemployment rates are not seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population. " + A(LINKS.cps, "Source: bls.gov (Current Population Survey)"));
-  h += emailTable("Unemployment Rates by Sex and Veteran Status", [{ name: "Women", span: 2 }, { name: "Men", span: 2 }], SEX_KEYS.map(k => fmt(m.rates[k])));
+  h += P("Unemployment Rates by " + A(LINKS.sex, "Sex and Veteran Status") + ". The unemployment and labor force participation rates are not seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population. " + A(LINKS.cps, "Source: bls.gov (Current Population Survey)"));
+  h += emailTable("Unemployment and Labor Force Participation Rates by Sex and Veteran Status", [{ name: "Women", span: 2 }, { name: "Men", span: 2 }],
+    [{ label: "Unemployment rates", values: SEX_KEYS.map(k => fmt(m.rates[k])) }, { label: "Labor force participation rates", values: LFPR_SEX_KEYS.map(k => fmt(m.rates[k])) }]);
   h += P("<b>By Race, Hispanic or Latino Ethnicity, and Veteran status</b>");
-  h += P("Unemployment Rates by " + A(LINKS.race, "Race, Hispanic or Latino Ethnicity, and Veteran Status") + ". The unemployment rates are not seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population. " + A(LINKS.cps, "Source: bls.gov (Current Population Survey)"));
-  h += emailTable("Unemployment Rates by Race, Hispanic or Latino Ethnicity, and Veteran status",
+  h += P("Unemployment Rates by " + A(LINKS.race, "Race, Hispanic or Latino Ethnicity, and Veteran Status") + ". The unemployment and labor force participation rates are not seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population. " + A(LINKS.cps, "Source: bls.gov (Current Population Survey)"));
+  h += emailTable("Unemployment and Labor Force Participation Rates by Race, Hispanic or Latino Ethnicity, and Veteran status",
     [{ name: "White", span: 2 }, { name: "Black or African American", span: 2 }, { name: "Asian", span: 2 }, { name: "Hispanic or Latino", span: 2 }],
-    RACE_KEYS.map(k => fmt(m.rates[k])));
+    [{ label: "Unemployment rates", values: RACE_KEYS.map(k => fmt(m.rates[k])) }, { label: "Labor force participation rates", values: LFPR_RACE_KEYS.map(k => fmt(m.rates[k])) }]);
   return h;
 }
 function renderText(m) {
@@ -359,14 +391,17 @@ function renderText(m) {
   const L = [];
   L.push("Please see the full compilation of " + m.monthYear + " Numbers Day unemployment rates by veteran status below. " + (m.note ? m.note + " " : "") + "Please let me know if you have any questions.", "");
   L.push(m.headline, "", m.vetSentence, "", m.nonvetSentence, "");
+  if (m.lfprVetSentence) L.push(m.lfprVetSentence + " " + m.lfprNonvetSentence, "");
   L.push("The unemployment rates are seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population. Source: bls.gov (Current Population Survey) " + LINKS.cps, "");
   L.push("BY DISABILITY STATUS AND VETERAN STATUS");
   L.push("Unemployment Rates by Disability Status and Veteran Status, " + (d ? monthYear(d.start) : "TBD") + " – " + (d ? monthYear(d.end) : "TBD") + " Averaged* (" + n + "-month moving average, unpublished BLS Table 16, not seasonally adjusted)" + (d ? d.note : ""));
   L.push("Veterans with a disability " + (d ? fmt(d.values.vet_disability) : "TBD") + "%, Nonveterans with a disability " + (d ? fmt(d.values.nonvet_disability) : "TBD") + "%, Veterans with no disability " + (d ? fmt(d.values.vet_no_disability) : "TBD") + "%, Nonveterans with no disability " + (d ? fmt(d.values.nonvet_no_disability) : "TBD") + "%.", "");
   L.push("BY SEX AND VETERAN STATUS (not seasonally adjusted)");
-  L.push("Women veterans " + fmt(m.rates.women_vet) + "%, Women nonveterans " + fmt(m.rates.women_nonvet) + "%, Men veterans " + fmt(m.rates.men_vet) + "%, Men nonveterans " + fmt(m.rates.men_nonvet) + "%.", "");
+  L.push("Unemployment rates: Women veterans " + fmt(m.rates.women_vet) + "%, Women nonveterans " + fmt(m.rates.women_nonvet) + "%, Men veterans " + fmt(m.rates.men_vet) + "%, Men nonveterans " + fmt(m.rates.men_nonvet) + "%.");
+  L.push("Labor force participation rates: Women veterans " + fmt(m.rates.lfpr_women_vet) + "%, Women nonveterans " + fmt(m.rates.lfpr_women_nonvet) + "%, Men veterans " + fmt(m.rates.lfpr_men_vet) + "%, Men nonveterans " + fmt(m.rates.lfpr_men_nonvet) + "%.", "");
   L.push("BY RACE, HISPANIC OR LATINO ETHNICITY, AND VETERAN STATUS (not seasonally adjusted)");
-  L.push("White veterans " + fmt(m.rates.white_vet) + "%, White nonveterans " + fmt(m.rates.white_nonvet) + "%, Black or African American veterans " + fmt(m.rates.black_vet) + "%, Black or African American nonveterans " + fmt(m.rates.black_nonvet) + "%, Asian veterans " + fmt(m.rates.asian_vet) + "%, Asian nonveterans " + fmt(m.rates.asian_nonvet) + "%, Hispanic or Latino veterans " + fmt(m.rates.hisp_vet) + "%, Hispanic or Latino nonveterans " + fmt(m.rates.hisp_nonvet) + "%.");
+  L.push("Unemployment rates: White veterans " + fmt(m.rates.white_vet) + "%, White nonveterans " + fmt(m.rates.white_nonvet) + "%, Black or African American veterans " + fmt(m.rates.black_vet) + "%, Black or African American nonveterans " + fmt(m.rates.black_nonvet) + "%, Asian veterans " + fmt(m.rates.asian_vet) + "%, Asian nonveterans " + fmt(m.rates.asian_nonvet) + "%, Hispanic or Latino veterans " + fmt(m.rates.hisp_vet) + "%, Hispanic or Latino nonveterans " + fmt(m.rates.hisp_nonvet) + "%.");
+  L.push("Labor force participation rates: White veterans " + fmt(m.rates.lfpr_white_vet) + "%, White nonveterans " + fmt(m.rates.lfpr_white_nonvet) + "%, Black or African American veterans " + fmt(m.rates.lfpr_black_vet) + "%, Black or African American nonveterans " + fmt(m.rates.lfpr_black_nonvet) + "%, Asian veterans " + fmt(m.rates.lfpr_asian_vet) + "%, Asian nonveterans " + fmt(m.rates.lfpr_asian_nonvet) + "%, Hispanic or Latino veterans " + fmt(m.rates.lfpr_hisp_vet) + "%, Hispanic or Latino nonveterans " + fmt(m.rates.lfpr_hisp_nonvet) + "%.");
   L.push("", "Source: bls.gov (Current Population Survey) " + LINKS.cps);
   return L.join("\n");
 }
@@ -385,7 +420,10 @@ const EXAMPLE = {
   headline: "Veteran Unemployment Rate was 3.6% in September",
   vetSentence: "In September 2026, the veteran unemployment rate was 3.6%, up from 3.5% the previous month and up from 2.7% the prior year.",
   nonvetSentence: "Also in September 2026, the comparable non-veteran unemployment rate was 4.0%, unchanged from the previous month and down from 4.4% the prior year.",
-  rates: { women_vet: 6.1, women_nonvet: 3.8, men_vet: 3.0, men_nonvet: 4.0, white_vet: 2.7, white_nonvet: 3.3, black_vet: 5.7, black_nonvet: 6.6, asian_vet: 6.8, asian_nonvet: 2.8, hisp_vet: 4.1, hisp_nonvet: 4.3 },
+  lfprVetSentence: "The veteran labor force participation rate was 48.1% in September 2026, down from 48.8% the previous month and down from 48.8% the prior year.",
+  lfprNonvetSentence: "The comparable non-veteran participation rate was 64.1%, up from 63.8% the previous month and down from 64.8% the prior year.",
+  rates: { women_vet: 6.1, women_nonvet: 3.8, men_vet: 3.0, men_nonvet: 4.0, white_vet: 2.7, white_nonvet: 3.3, black_vet: 5.7, black_nonvet: 6.6, asian_vet: 6.8, asian_nonvet: 2.8, hisp_vet: 4.1, hisp_nonvet: 4.3,
+    lfpr_women_vet: 54.8, lfpr_women_nonvet: 57.7, lfpr_men_vet: 47.4, lfpr_men_nonvet: 71.6, lfpr_white_vet: 46.7, lfpr_white_nonvet: 63.2, lfpr_black_vet: 50.7, lfpr_black_nonvet: 65.1, lfpr_asian_vet: 66.0, lfpr_asian_nonvet: 67.1, lfpr_hisp_vet: 60.2, lfpr_hisp_nonvet: 70.7 },
   disab: { values: { vet_disability: 6.5, nonvet_disability: 7.9, vet_no_disability: 3.4, nonvet_no_disability: 4.0 }, n: 11, window: 12, start: [2025, 11], end: [2026, 9], missing: [[2025, 10]], note: " (October 2025 data unavailable due to the 2025 lapse in appropriations.)" }
 };
 
@@ -417,13 +455,16 @@ function renderSchedulePill() {
 // ----- disability rows -----
 function getRows() { return store.get("disability", []); }
 function setRows(rows) { store.set("disability", rows); renderRows(); }
+let showAllRows = false;
 function renderRows() {
-  const rows = getRows().slice().sort((a, b) => a.month < b.month ? -1 : 1);
+  const all = getRows().slice().sort((a, b) => a.month < b.month ? -1 : 1);
+  const rows = (showAllRows || all.length <= 14) ? all : all.slice(-13);
+  const offset = all.length - rows.length;
   const tb = $("disabTable").querySelector("tbody");
-  tb.innerHTML = rows.map((r, i) => "<tr>" +
+  tb.innerHTML = rows.map((r, j) => { const i = j + offset; return "<tr>" +
     '<td><input type="text" aria-label="Month" value="' + esc(r.month) + '" data-i="' + i + '" data-f="month" placeholder="2026-09"></td>' +
     COLS.map(c => '<td><input type="text" inputmode="decimal" aria-label="' + c + '" value="' + esc(r[c] == null ? "" : r[c]) + '" data-i="' + i + '" data-f="' + c + '"></td>').join("") +
-    '<td><button class="btn small" type="button" data-del="' + i + '" aria-label="Remove row">×</button></td></tr>').join("");
+    '<td><button class="btn small" type="button" data-del="' + i + '" aria-label="Remove row">×</button></td></tr>'; }).join("");
   tb.querySelectorAll("input").forEach(inp => inp.addEventListener("change", e => {
     const all = getRows().slice().sort((a, b) => a.month < b.month ? -1 : 1);
     const r = all[+e.target.dataset.i]; const f = e.target.dataset.f;
@@ -431,7 +472,14 @@ function renderRows() {
     setRows(all);
   }));
   tb.querySelectorAll("button[data-del]").forEach(b => b.addEventListener("click", e => { const all = getRows().slice().sort((a, b) => a.month < b.month ? -1 : 1); all.splice(+e.target.dataset.del, 1); setRows(all); }));
-  $("disabHint").textContent = rows.length ? rows.length + " month" + (rows.length === 1 ? "" : "s") + " stored, " + rows[0].month + " to " + rows[rows.length - 1].month + "." : "No rows yet. The disability block will show TBD until the reference month's row exists.";
+  const hint = $("disabHint");
+  hint.textContent = all.length ? all.length + " month" + (all.length === 1 ? "" : "s") + " stored, " + all[0].month + " to " + all[all.length - 1].month + ". " : "No rows yet. The disability block will show TBD until the reference month's row exists.";
+  if (all.length > 14) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "linkbtn";
+    b.textContent = showAllRows ? "Show the last 13 months only" : "Showing the last 13; show all " + all.length;
+    b.addEventListener("click", () => { showAllRows = !showAllRows; renderRows(); });
+    hint.appendChild(b);
+  }
 }
 function rowsAsMap() { const m = {}; for (const r of getRows()) if (/^\d{4}-\d{2}$/.test(r.month)) m[r.month] = r; return m; }
 $("addRow").addEventListener("click", () => {
@@ -661,17 +709,19 @@ function buildModel(data, month, rows, note) {
   let disab = null;
   const ma = movingAverage(rows, month);
   if (ma.error) warnings.push(ma.error); else { disab = ma; warnings.push(...ma.warnings); }
-  const rates = {}; for (const k of [...SEX_KEYS, ...RACE_KEYS]) rates[k] = val(data[k], month);
+  const part = buildParticipation(data.lfpr_vet_sa, data.lfpr_nonvet_sa, month);
+  warnings.push(...part.warnings);
+  const rates = {}; for (const k of [...SEX_KEYS, ...RACE_KEYS, ...LFPR_SEX_KEYS, ...LFPR_RACE_KEYS]) rates[k] = val(data[k], month);
   const prev = shift(month, -1), yr = shift(month, -12);
   const audit = {
     generated: new Date().toISOString(), source: "VETS Numbers Day portal", reference_month: mkey(month[0], month[1]),
-    text: { headline: head.headline, vet_sentence: head.vetSentence, nonvet_sentence: head.nonvetSentence },
+    text: { headline: head.headline, vet_sentence: head.vetSentence, nonvet_sentence: head.nonvetSentence, lfpr_vet_sentence: part.vetSentence, lfpr_nonvet_sentence: part.nonvetSentence },
     rates: Object.fromEntries(Object.keys(SERIES).map(role => [role, { series_id: SERIES[role], label: LABELS[role], title: data[role].title, value: val(data[role], month), previous_month: val(data[role], prev), year_ago: val(data[role], yr), standard_error: data[role].se[mkey(month[0], month[1])] ?? null }])),
     disability: disab ? { values: Object.fromEntries(COLS.map(c => [c, Math.round(disab.values[c] * 100) / 100])), months_averaged: disab.n, window: disab.window, start: monthYear(disab.start), end: monthYear(disab.end), missing: disab.missing.map(monthYear) } : null,
     api_footnotes: [...new Set(Object.values(data).flatMap(s => s.notes))].sort(),
     warnings
   };
-  return { model: { month, monthYear: monthYear(month), note: (note || "").trim(), headline: head.headline, vetSentence: head.vetSentence, nonvetSentence: head.nonvetSentence, rates, disab }, audit, warnings };
+  return { model: { month, monthYear: monthYear(month), note: (note || "").trim(), headline: head.headline, vetSentence: head.vetSentence, nonvetSentence: head.nonvetSentence, lfprVetSentence: part.vetSentence, lfprNonvetSentence: part.nonvetSentence, rates, disab }, audit, warnings };
 }
 function renderNumbers(data, month, audit) {
   const tb = $("numbersTable").querySelector("tbody");
@@ -684,7 +734,7 @@ function fillMonthSelect(data, chosen) {
   sel.value = keep;
 }
 async function build() {
-  const btn = $("build"); btn.disabled = true; $("buildStatus").textContent = "Fetching 16 series from api.bls.gov…"; setAlerts([]);
+  const btn = $("build"); btn.disabled = true; $("buildStatus").textContent = "Fetching 32 series from api.bls.gov…"; setAlerts([]);
   const apiKey = store.get("key", "") || $("apiKey").value.trim();
   try {
     const endYear = new Date().getFullYear();
