@@ -146,7 +146,7 @@ footer { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block:
       </div>
       <div class="row" style="margin-top:8px">
         <button class="btn small" type="button" id="addRow">Add month</button>
-        <label class="btn small" for="csvFile" style="margin:0">Import CSV</label>
+        <label class="btn small" for="csvFile" style="margin:0" title="The tool's CSV or the calculation workbook exported as CSV">Import CSV</label>
         <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
         <button class="btn small" type="button" id="exportCsv">Export CSV</button>
         <button class="btn small" type="button" id="copyCsv">Copy CSV</button>
@@ -535,22 +535,85 @@ $("exportCsv").addEventListener("click", () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast("table16.csv saved to your Downloads folder.");
 });
 $("copyCsv").addEventListener("click", async () => { toast((await copyPlain(rowsAsCsv())) ? "CSV copied. Paste it into table16.csv." : "Copy was blocked."); });
+function parseLooseMonth(text, previous) {
+  const t = String(text == null ? "" : text).trim().replace(/\*+$/, "").trim();
+  if (!t) return null;
+  let m = t.match(/^(\d{4})-(\d{1,2})(?:-\d{1,2})?$/); if (m) return [+m[1], +m[2]];
+  m = t.match(/^(\d{1,2})\/(?:\d{1,2}\/)?(\d{2,4})$/); if (m) { const y = +m[2]; return [y > 99 ? y : 2000 + y, +m[1]]; }
+  if (/^\d{5}$/.test(t)) { const d = new Date(Date.UTC(1899, 11, 30) + (+t) * 86400000); return [d.getUTCFullYear(), d.getUTCMonth() + 1]; }
+  const parts = t.split(/[-\s,\/]+/).filter(Boolean);
+  const abbr = x => x.slice(0, 3).toLowerCase();
+  const name = parts.find(x => /^[A-Za-z]+$/.test(x) && MONTHS.some(M => abbr(M) === abbr(x)));
+  if (!name) throw new Error("unrecognized month '" + text + "'");
+  const month = MONTHS.findIndex(M => abbr(M) === abbr(name)) + 1;
+  const numbers = parts.filter(x => /^\d+$/.test(x));
+  const four = numbers.filter(x => x.length === 4); if (four.length) return [+four[0], month];
+  if (previous) { const exp = shift(previous, 1); if (exp[1] === month) return exp; }
+  const two = numbers.filter(x => x.length <= 2 && +x >= 18); if (two.length) return [2000 + (+two[0]), month];
+  if (previous) return [month > previous[1] ? previous[0] : previous[0] + 1, month];
+  throw new Error("cannot tell the year of '" + text + "'");
+}
+function parseCsvLine(line) {
+  const out = []; let cur = "", q = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (q) { if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+    else if (ch === '"') q = true; else if (ch === ",") { out.push(cur); cur = ""; } else cur += ch;
+  }
+  out.push(cur); return out.map(x => x.trim());
+}
+function parseDisabilityCsv(text) {
+  const table = text.replace(/^﻿/, "").split(/\r?\n/).filter(l => l.trim()).map(parseCsvLine);
+  if (!table.length) throw new Error("the file is empty");
+  const num = v => { const x = String(v == null ? "" : v).trim().toLowerCase(); return (x === "" || x === "-" || x === "na" || x === "n/a") ? null : parseFloat(x); };
+  const head = table[0].map(x => x.toLowerCase());
+  if (head.includes("month") && COLS.every(c => head.includes(c))) {
+    const idx = Object.fromEntries(["month"].concat(COLS, LEVEL_COLS).map(c => [c, head.indexOf(c)]));
+    const rows = [];
+    for (const r of table.slice(1)) { const mk = r[idx.month]; if (!mk) continue; const row = { month: mk }; for (const c of COLS.concat(LEVEL_COLS)) if (idx[c] >= 0) row[c] = num(r[idx[c]]); rows.push(row); }
+    return { layout: "numbersday", rows, averages: {} };
+  }
+  for (let i = 0; i < table.length; i++) {
+    const low = table[i].map(x => x.toLowerCase()); const c0 = low.indexOf("month");
+    if (c0 >= 0 && low.slice(c0 + 1, c0 + 5).join() === "veterans,nonveterans,veterans,nonveterans") {
+      const rows = [], averages = {}; let previous = null;
+      for (const r of table.slice(i + 1)) {
+        if (r.length <= c0 + 4) continue;
+        const mon = parseLooseMonth(r[c0], previous); if (!mon) continue; previous = mon;
+        const vals = r.slice(c0 + 1, c0 + 5).map(num); if (vals.some(v => v == null || isNaN(v))) continue;
+        const key = mkey(mon[0], mon[1]); const row = { month: key }; COLS.forEach((c, k) => row[c] = vals[k]); rows.push(row);
+        const avg = r.slice(c0 + 6, c0 + 10).map(num);
+        if (avg.length === 4 && avg.every(v => v != null && !isNaN(v))) { averages[key] = {}; COLS.forEach((c, k) => averages[key][c] = avg[k]); }
+      }
+      if (!rows.length) throw new Error("the workbook CSV has no complete monthly rows");
+      return { layout: "workbook", rows, averages };
+    }
+  }
+  throw new Error("CSV needs the columns month," + COLS.join(",") + " or the calculation workbook's layout with its Month header");
+}
 $("csvFile").addEventListener("change", e => {
   const f = e.target.files[0]; if (!f) return;
   const reader = new FileReader();
   reader.onload = () => {
-    const lines = String(reader.result).replace(/^﻿/, "").split(/\r?\n/).filter(l => l.trim());
-    const head = lines.shift().split(",").map(s => s.trim().toLowerCase());
-    const idx = n => head.indexOf(n);
-    if (["month", ...COLS].some(c => idx(c) < 0)) { toast("CSV needs columns: month," + COLS.join(",")); return; }
-    const rows = getRows(); const byMonth = {}; rows.forEach(r => byMonth[r.month] = r);
-    for (const l of lines) {
-      const c = l.split(",").map(s => s.trim());
-      const r = { month: c[idx("month")] };
-      for (const col of COLS.concat(LEVEL_COLS)) { if (idx(col) < 0) continue; const v = (c[idx(col)] || "").toLowerCase(); r[col] = (v === "" || v === "-" || v === "na" || v === "n/a") ? null : parseFloat(v); }
-      byMonth[r.month] = r;
-    }
-    setRows(Object.values(byMonth)); toast("Imported " + lines.length + " rows");
+    try {
+      const parsed = parseDisabilityCsv(String(reader.result));
+      const byMonth = {}; getRows().forEach(r => byMonth[r.month] = r); parsed.rows.forEach(r => byMonth[r.month] = r);
+      setRows(Object.values(byMonth));
+      const months = parsed.rows.map(r => r.month).sort();
+      let status = "Imported " + parsed.rows.length + " month" + (parsed.rows.length === 1 ? "" : "s") + " from " + f.name +
+        (parsed.layout === "workbook" ? " (calculation workbook layout)" : "") + ", " + monthYear(parseKey(months[0])) + " to " + monthYear(parseKey(months[months.length - 1])) + ".";
+      const last = months[months.length - 1];
+      if (parsed.averages[last]) {
+        const ma = movingAverage(rowsAsMap(), parseKey(last));
+        if (!ma.error) {
+          const off = COLS.filter(c => Math.abs(parsed.averages[last][c] - ma.values[c]) > 0.051);
+          status += off.length
+            ? " The workbook's own average for " + monthYear(parseKey(last)) + " differs from the page's (" + off.map(c => c + " " + parsed.averages[last][c].toFixed(1) + " vs " + ma.values[c].toFixed(1)).join(", ") + "); check the workbook's AVERAGE ranges."
+            : " The workbook's own average for " + monthYear(parseKey(last)) + " matches the page's: " + COLS.map(c => ma.values[c].toFixed(1)).join(" / ") + ".";
+        }
+      }
+      $("pdfStatus").textContent = status; toast("Imported " + parsed.rows.length + " rows");
+    } catch (err) { $("pdfStatus").textContent = "Could not import " + f.name + ": " + (err && err.message || err); toast("Import failed"); }
   };
   reader.readAsText(f); e.target.value = "";
 });
