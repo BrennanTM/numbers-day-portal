@@ -143,9 +143,12 @@ footer { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block:
         <button class="btn small" type="button" id="addRow">Add month</button>
         <label class="btn small" for="csvFile" style="margin:0">Import CSV</label>
         <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
+        <button class="btn small" type="button" id="exportCsv">Export CSV</button>
+        <button class="btn small" type="button" id="copyCsv">Copy CSV</button>
         <button class="btn small" type="button" id="clearRows">Clear</button>
       </div>
       <p class="hint" id="disabHint" style="margin-top:8px"></p>
+      <p class="hint">Keep the CSV in the Numbers Day folder as the record; the same file feeds <code>numbers-day run --disability</code>. Import it here after adding a month, or export the rows from here after typing them.</p>
     </div>
 
     <div class="card">
@@ -434,6 +437,17 @@ $("addRow").addEventListener("click", () => {
   setRows(rows);
 });
 $("clearRows").addEventListener("click", () => { if (getRows().length && $("clearRows").dataset.armed) { setRows([]); delete $("clearRows").dataset.armed; $("clearRows").textContent = "Clear"; } else { $("clearRows").dataset.armed = "1"; $("clearRows").textContent = "Click again to clear"; setTimeout(() => { delete $("clearRows").dataset.armed; $("clearRows").textContent = "Clear"; }, 3000); } });
+function rowsAsCsv() {
+  const rows = getRows().slice().sort((a, b) => a.month < b.month ? -1 : 1);
+  return ["month," + COLS.join(",")].concat(rows.map(r => [r.month].concat(COLS.map(c => r[c] == null ? "" : r[c])).join(","))).join("\n") + "\n";
+}
+$("exportCsv").addEventListener("click", () => {
+  if (!getRows().length) { toast("No rows to export yet."); return; }
+  const blob = new Blob([rowsAsCsv()], { type: "text/csv" }); const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "table16.csv"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast("table16.csv saved to your Downloads folder.");
+});
+$("copyCsv").addEventListener("click", async () => { toast((await copyPlain(rowsAsCsv())) ? "CSV copied. Paste it into table16.csv." : "Copy was blocked."); });
 $("csvFile").addEventListener("change", e => {
   const f = e.target.files[0]; if (!f) return;
   const reader = new FileReader();
