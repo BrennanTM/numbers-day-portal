@@ -13,3 +13,5 @@ it writes the Word report, reads the same PDF, and can open an Outlook draft.
 
 No key and no data live in this repository. Data: U.S. Bureau of Labor Statistics, Current
 Population Survey, retrieved live from api.bls.gov.
+
+`PROCESS.md` (also `PROCESS.docx`) documents the monthly process, the data sources, the calculations, the validation checks and the remaining manual steps.

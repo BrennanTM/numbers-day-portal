@@ -95,6 +95,13 @@ table.data th, table.data td { padding: 5px 6px; border-bottom: 1px solid var(--
 table.data th:first-child, table.data td:first-child { text-align: left; }
 table.data th { color: var(--muted); font-weight: 600; font-size: 12px; }
 table.data td.id { font-family: var(--mono); font-size: 12px; text-align: left; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.checks li { display: grid; grid-template-columns: 52px 1fr; gap: 10px; align-items: start; }
+.checks .st { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-align: center; padding: 2px 0; border-radius: 4px; background: var(--code-bg); color: var(--muted); }
+.checks .st.pass { background: var(--ok-soft); color: var(--ok); }
+.checks .st.warn { background: var(--warn-soft); color: var(--warn); }
+.checks .st.fail { background: var(--accent-soft); color: var(--accent); }
+.checks b { font-weight: 600; }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 6px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100% - 32px); }
 .toast.show { opacity: 1; }
 footer { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 0 30px; color: var(--muted); font-size: 13px; }
@@ -175,12 +182,18 @@ footer { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block:
         </div>
         <button class="btn primary" type="button" id="copyEmail">Copy email for Outlook</button>
         <button class="btn" type="button" id="copyText">Copy as plain text</button>
+        <button class="btn" type="button" id="copyWeb">Copy web page blocks</button>
         <button class="btn" type="button" id="copyJson">Copy audit JSON</button>
         <button class="btn" type="button" id="downloadJson">Download JSON</button>
       </div>
     </div>
 
     <div class="alerts" id="alerts"></div>
+
+    <div class="card" id="checksCard" hidden>
+      <h2>Checks</h2>
+      <ul class="checks" id="checks"></ul>
+    </div>
 
     <div class="card">
       <div class="preview-head">
@@ -199,7 +212,7 @@ footer { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block:
     </div>
   </section>
 </main>
-<footer>Runs entirely in the browser. Data: U.S. Bureau of Labor Statistics, Current Population Survey, retrieved live from api.bls.gov. Standard errors are BLS's own, published from January 2026 data onward.</footer>
+<footer>Runs entirely in the browser. Data: U.S. Bureau of Labor Statistics, Current Population Survey, retrieved live from api.bls.gov. Standard errors are BLS's own, published from January 2026 data onward. <a href="https://github.com/BrennanTM/numbers-day-portal/blob/main/PROCESS.md">Process documentation</a> · <a href="https://github.com/BrennanTM/numbers-day-portal/releases">Command-line companion</a>.</footer>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -404,6 +417,42 @@ function renderText(m) {
   L.push("Labor force participation rates: White veterans " + fmt(m.rates.lfpr_white_vet) + "%, White nonveterans " + fmt(m.rates.lfpr_white_nonvet) + "%, Black or African American veterans " + fmt(m.rates.lfpr_black_vet) + "%, Black or African American nonveterans " + fmt(m.rates.lfpr_black_nonvet) + "%, Asian veterans " + fmt(m.rates.lfpr_asian_vet) + "%, Asian nonveterans " + fmt(m.rates.lfpr_asian_nonvet) + "%, Hispanic or Latino veterans " + fmt(m.rates.lfpr_hisp_vet) + "%, Hispanic or Latino nonveterans " + fmt(m.rates.lfpr_hisp_nonvet) + "%.");
   L.push("", "Source: bls.gov (Current Population Survey) " + LINKS.cps);
   return L.join("\n");
+}
+
+// ----- web page text blocks (dol.gov/agencies/vets/latest-numbers), pasted into the CMS source view -----
+const WEB = {
+  sex: [["women_vet", "Women Veterans"], ["women_nonvet", "Women Nonveterans"], ["men_vet", "Male Veterans"], ["men_nonvet", "Male Nonveterans"]],
+  race: [["white_vet", "White Veterans"], ["white_nonvet", "White Nonveterans"], ["black_vet", "Black or African American Veterans"], ["black_nonvet", "Black or African American Nonveterans"],
+         ["asian_vet", "Asian Veterans"], ["asian_nonvet", "Asian Nonveterans"], ["hisp_vet", "Hispanic or Latino Veterans"], ["hisp_nonvet", "Hispanic or Latino Nonveterans"]],
+  disab: [["vet_disability", "Veterans with a disability"], ["nonvet_disability", "Nonveterans with a disability"], ["vet_no_disability", "Veterans with no disability"], ["nonvet_no_disability", "Nonveterans with no disability"]]
+};
+const WEB_NSA = "The unemployment and labor force participation rates are not seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population.";
+const WEB_SOURCE = '<a href="' + LINKS.cps + '"><em>Source: bls.gov (Current Population Survey)</em></a>';
+const amp = u => u.replace(/&/g, "&amp;");
+function webLines(pairs, get, prefix) { return "<p>" + (prefix || "") + pairs.map(([k, label]) => label + " " + get(k) + "%").join(",<br>") + ".</p>"; }
+function renderWebBlocks(m) {
+  const rel = SCHEDULE.find(r => r.reference === mkey(m.month[0], m.month[1]));
+  const d = rel ? new Date(rel.date + "T12:00:00") : new Date();
+  const dateText = MONTHS[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
+  const ur = k => fmt(m.rates[k]), lf = k => fmt(m.rates["lfpr_" + k]);
+  const dis = m.disab;
+  const blocks = [];
+  blocks.push(["Date and headline (block 1)", "<h3>" + dateText + "</h3><h2>" + esc(m.headline) + "</h2>"]);
+  blocks.push(["Narrative (block 3)", "<p>" + esc(m.vetSentence) + " " + esc(m.nonvetSentence) + (m.lfprVetSentence ? " " + esc(m.lfprVetSentence) + " " + esc(m.lfprNonvetSentence) : "") +
+    ' The <a href="' + amp(LINKS.sa) + '">unemployment and labor force participation rates</a> are seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population. ' + WEB_SOURCE + "</p>"]);
+  blocks.push(["Sex (block 7)", "<h3>Unemployment Rates by Sex and Veteran Status</h3>" + webLines(WEB.sex, ur) + webLines(WEB.sex, lf, "Labor force participation rates: ") +
+    '<p>Unemployment Rates by <a href="' + amp(LINKS.sex) + '">Sex and Veteran Status</a>. ' + WEB_NSA + " " + WEB_SOURCE + "</p>"]);
+  blocks.push(["Disability (block 9)", "<h3>Unemployment Rates by Disability and Veteran Status</h3>" +
+    '<p>Unemployment Rates by <a href="' + LINKS.disab + '">Disability Status and Veteran Status</a>, ' + (dis ? monthYear(dis.start) + " – " + monthYear(dis.end) : "TBD – TBD") + ' Averaged* <a href="' + LINKS.cps + '">Source: Current Population Survey</a></p>' +
+    webLines(WEB.disab, k => dis ? fmt(dis.values[k]) : "TBD") +
+    "<p>*" + (dis ? dis.n : 12) + "-month moving average generated using unpublished data tables from the Disability package obtained from the U.S. Bureau of Labor Statistics: Table 16. Employment status of persons 18 years and over by veteran status, period of service, sex, race, Hispanic or Latino ethnicity, and disability status. The unemployment rates are not seasonally adjusted for individuals aged 18 years and over in the civilian non-institutional population." + (dis ? esc(dis.note) : "") + "</p>"]);
+  blocks.push(["Race (block 11)", "<h3>Unemployment Rates by Race, Hispanic or Latino Ethnicity and Veteran Status</h3>" + webLines(WEB.race, ur) + webLines(WEB.race, lf, "Labor force participation rates: ") +
+    '<p>Unemployment Rates by <a href="' + amp(LINKS.race) + '">Race, Hispanic or Latino Ethnicity, and Veteran Status</a>. ' + WEB_NSA + " " + WEB_SOURCE + "</p>"]);
+  return blocks;
+}
+function webBlocksText(m) {
+  return "Latest Numbers page, text blocks for " + m.monthYear + ". Paste each into the matching text block in source view. Image alt texts: hero \u201c" + m.headline + "\u201d; \u201cSex and Veteran Status\u201d; \u201cVETS Disability Status\u201d; \u201cRace, Hispanic or Latino Ethnicity, and Veteran status\u201d.\n\n" +
+    renderWebBlocks(m).map(([name, html]) => "<!-- " + name + " -->\n" + html).join("\n\n") + "\n";
 }
 
 // ----- storage -----
@@ -647,6 +696,7 @@ $("csvFile").addEventListener("change", e => {
       const parsed = parseDisabilityCsv(String(reader.result));
       const byMonth = {}; getRows().forEach(r => byMonth[r.month] = r); parsed.rows.forEach(r => byMonth[r.month] = r);
       setRows(Object.values(byMonth));
+      if (Object.keys(parsed.averages).length) store.set("workbookAverages", Object.assign(store.get("workbookAverages", {}) || {}, parsed.averages));
       const months = parsed.rows.map(r => r.month).sort();
       let status = "Imported " + parsed.rows.length + " month" + (parsed.rows.length === 1 ? "" : "s") + " from " + f.name +
         (parsed.layout === "workbook" ? " (calculation workbook layout)" : "") + ", " + monthYear(parseKey(months[0])) + " to " + monthYear(parseKey(months[months.length - 1])) + ".";
@@ -703,9 +753,6 @@ async function fetchAll(apiKey, endYear) {
 function buildModel(data, month, rows, note) {
   const head = buildHeadline(data.vet_sa, data.nonvet_sa, month);
   const warnings = head.warnings.slice();
-  const latestFlag = data.vet_sa.latest ? parseKey(data.vet_sa.latest) : null;
-  const common = latestCommonMonth(data);
-  if (latestFlag && common && mkey(latestFlag[0], latestFlag[1]) !== mkey(common[0], common[1])) warnings.push("Series disagree on the latest month (headline series: " + monthYear(latestFlag) + "). The API may be mid-update; rebuild in a few minutes.");
   let disab = null;
   const ma = movingAverage(rows, month);
   if (ma.error) warnings.push(ma.error); else { disab = ma; warnings.push(...ma.warnings); }
@@ -721,7 +768,80 @@ function buildModel(data, month, rows, note) {
     api_footnotes: [...new Set(Object.values(data).flatMap(s => s.notes))].sort(),
     warnings
   };
-  return { model: { month, monthYear: monthYear(month), note: (note || "").trim(), headline: head.headline, vetSentence: head.vetSentence, nonvetSentence: head.nonvetSentence, lfprVetSentence: part.vetSentence, lfprNonvetSentence: part.nonvetSentence, rates, disab }, audit, warnings };
+  return { model: { month, monthYear: monthYear(month), note: (note || "").trim(), headline: head.headline, vetSentence: head.vetSentence, nonvetSentence: head.nonvetSentence, lfprVetSentence: part.vetSentence, lfprNonvetSentence: part.nonvetSentence, rates, disab }, audit, warnings, head, part };
+}
+const CHANGE_FACTORS = { vet_sa: [1.114, 1.370], nonvet_sa: [1.101, 1.348], lfpr_vet_sa: [0.835, 1.197], lfpr_nonvet_sa: [0.839, 1.231] };
+function directionOk(sentence, current) {
+  for (const m of sentence.matchAll(/(up from|down from|unchanged from) ?([\d.]+)?%?/g)) {
+    if (m[1] === "unchanged from") continue;
+    if (m[2] == null) return false;
+    const v = parseFloat(m[2]);
+    if (m[1] === "up from" && !(current > v)) return false;
+    if (m[1] === "down from" && !(current < v)) return false;
+  }
+  return true;
+}
+function runChecks(data, month, head, part, disab, previous, workbookAvg) {
+  const out = [];
+  const add = (name, status, detail) => out.push({ name, status, detail });
+  const latest = [...new Set(Object.values(data).map(s => s.latest).filter(Boolean))].sort();
+  if (latest.length > 1) add("Series agree on latest month", "warn", "the API reports different latest months (" + latest.map(k => monthYear(parseKey(k))).join(", ") + "); it may be mid-update, rebuild in a few minutes");
+  else if (latest.length && latest[0] > mkey(month[0], month[1])) add("Series agree on latest month", "pass", "rebuilding " + monthYear(month) + "; the latest published month is " + monthYear(parseKey(latest[0])));
+  else add("Series agree on latest month", "pass", "all " + Object.keys(data).length + " series report " + monthYear(month) + " as the latest month");
+  const bad = [];
+  for (const [role, s] of Object.entries(data)) { const v = val(s, month); const [lo, hi] = role.startsWith("lfpr_") ? [10, 95] : [0, 40]; if (v == null || v < lo || v > hi) bad.push(LABELS[role] + "=" + v); }
+  add("Rates within plausible ranges", bad.length ? "fail" : "pass", bad.length ? "out of range or missing: " + bad.join("; ") : "unemployment rates within 0-40, participation rates within 10-95");
+  const problems = [];
+  for (const [sentence, rate] of [[head.vetSentence, head.vetRate], [head.nonvetSentence, head.nonvetRate], [part.vetSentence, part.vetRate], [part.nonvetSentence, part.nonvetRate]]) {
+    if (!sentence.includes(rate.toFixed(1) + "%")) problems.push("value " + rate.toFixed(1) + " missing from: " + sentence.slice(0, 50));
+    else if (!directionOk(sentence, rate)) problems.push("direction words contradict the numbers in: " + sentence.slice(0, 60));
+    if (sentence.includes("[no ")) problems.push("a comparison has no value: " + sentence.slice(0, 60));
+  }
+  add("Sentences match the numbers", problems.length ? "fail" : "pass", problems.length ? problems.join("; ") : "each sentence states its rate and its comparisons point the right way");
+  if (!previous) add("Consistent with the previous build", "pass", "no earlier build in this browser to compare with");
+  else {
+    const prevMonth = shift(month, -1); const changed = [];
+    if (previous.reference_month === mkey(prevMonth[0], prevMonth[1])) {
+      for (const [role, s] of Object.entries(data)) { const o = (previous.rates[role] || {}).value, n = val(s, prevMonth); if (o != null && n != null && Math.abs(o - n) > 0.05) changed.push(LABELS[role] + " " + monthYear(prevMonth) + ": " + o.toFixed(1) + " then, " + n.toFixed(1) + " now"); }
+      add("Consistent with the previous build", changed.length ? "warn" : "pass", changed.length ? "values for " + monthYear(prevMonth) + " differ from last month's build (BLS revision?): " + changed.slice(0, 6).join("; ") : "last month's values are unchanged in this month's data");
+    } else if (previous.reference_month === mkey(month[0], month[1])) {
+      for (const [role, s] of Object.entries(data)) { const o = (previous.rates[role] || {}).value, n = val(s, month); if (o != null && n != null && Math.abs(o - n) > 0.05) changed.push(LABELS[role] + ": " + o.toFixed(1) + " then, " + n.toFixed(1) + " now"); }
+      add("Consistent with the previous build", changed.length ? "warn" : "pass", changed.length ? "values changed since the earlier build of this month: " + changed.slice(0, 6).join("; ") : "same values as the earlier build of this month (" + String(previous.generated).slice(0, 16) + ")");
+    } else add("Consistent with the previous build", "pass", "the earlier build covers " + previous.reference_month + "; nothing to compare");
+  }
+  const notes = [];
+  for (const [role, [fm, fy]] of Object.entries(CHANGE_FACTORS)) {
+    const s = data[role]; const se = s.se[mkey(month[0], month[1])]; const cur = val(s, month); if (se == null || cur == null) continue;
+    for (const [label, when, f] of [["previous month", shift(month, -1), fm], ["a year ago", shift(month, -12), fy]]) {
+      const prior = val(s, when); if (prior == null) continue;
+      const change = cur - prior, bound = 1.645 * f * se;
+      notes.push(LABELS[role] + " " + (change >= 0 ? "+" : "") + change.toFixed(1) + " vs " + label + " " + (Math.abs(change) < bound ? "within" : "beyond") + " sampling error (±" + bound.toFixed(1) + ")");
+    }
+  }
+  add("Changes against sampling error", "pass", notes.length ? notes.join("; ") : "standard errors not available (they need a registered key and 2026 data)");
+  if (!disab) add("Disability window", "warn", "no Table 16 data for " + monthYear(month) + "; the block reads TBD");
+  else {
+    const unknown = disab.missing.filter(m => !KNOWN_GAPS[mkey(m[0], m[1])]);
+    let detail = disab.n + " of " + disab.window + " months, " + monthYear(disab.start) + " to " + monthYear(disab.end);
+    if (disab.missing.length) detail += "; missing " + disab.missing.map(monthYear).join(", ") + (unknown.length ? " (NOT a known gap)" : " (known gap)");
+    add("Disability window", unknown.length ? "warn" : "pass", detail);
+    if (workbookAvg) {
+      const off = COLS.filter(c => Math.abs(workbookAvg[c] - disab.values[c]) > 0.051);
+      add("Workbook cross-check", off.length ? "warn" : "pass", off.length ? "the workbook's own average differs: " + off.map(c => c + " " + workbookAvg[c].toFixed(1) + " vs " + disab.values[c].toFixed(1)).join(", ") + "; check its AVERAGE ranges" : "the workbook's own average matches: " + COLS.map(c => disab.values[c].toFixed(1)).join(" / "));
+    }
+  }
+  const today = new Date(); const t = mkey(today.getFullYear(), today.getMonth() + 1) + "-" + String(today.getDate()).padStart(2, "0");
+  const rel = SCHEDULE.find(r => r.reference === mkey(month[0], month[1]));
+  const expected = SCHEDULE.filter(r => r.date <= t).sort((a, b) => a.date < b.date ? 1 : -1)[0];
+  if (!rel) add("Release schedule", "warn", monthYear(month) + " is not in the bundled release schedule; the page needs its schedule updated");
+  else if (rel.date > t) add("Release schedule", "warn", monthYear(month) + " data are scheduled for release on " + rel.date + ", after today");
+  else if (expected && expected.reference === rel.reference) add("Release schedule", "pass", monthYear(month) + " data were released " + rel.date + "; this is the current month");
+  else add("Release schedule", "pass", monthYear(month) + " data were released " + rel.date + "; the current month is " + (expected ? monthYear(parseKey(expected.reference)) : "unknown"));
+  return out;
+}
+function renderChecks(checks) {
+  $("checksCard").hidden = false;
+  $("checks").innerHTML = checks.map(c => '<li><span class="st ' + c.status + '">' + c.status.toUpperCase() + "</span><span><b>" + esc(c.name) + ".</b> " + esc(c.detail) + "</span></li>").join("");
 }
 function renderNumbers(data, month, audit) {
   const tb = $("numbersTable").querySelector("tbody");
@@ -744,8 +864,13 @@ async function build() {
     if (!month) throw new Error("The API returned no month with values for every series.");
     if (chosen && Object.values(data).some(s => val(s, month) == null)) throw new Error("No published values for " + monthYear(month) + " yet.");
     store.set("note", $("note").value);
-    const { model, audit, warnings } = buildModel(data, month, rowsAsMap(), $("note").value);
+    const { model, audit, warnings, head, part } = buildModel(data, month, rowsAsMap(), $("note").value);
+    const wbAvg = (store.get("workbookAverages", {}) || {})[mkey(month[0], month[1])] || null;
+    const checks = runChecks(data, month, head, part, model.disab, store.get("lastAudit", null), wbAvg);
+    audit.qa = checks;
     state.data = data; state.audit = audit;
+    store.set("lastAudit", { reference_month: audit.reference_month, generated: audit.generated, rates: audit.rates });
+    renderChecks(checks);
     delete $("subject").dataset.edited;
     showModel(model, false);
     fillMonthSelect(data, chosen);
@@ -786,6 +911,7 @@ $("copyEmail").addEventListener("click", async () => {
   const ok = await copyRich(html, renderText(state.model));
   toast(ok ? "Email copied. Paste into a new Outlook message." : "Copy was blocked. Select the email body and copy it by hand.");
 });
+$("copyWeb").addEventListener("click", async () => { toast((await copyPlain(webBlocksText(state.model))) ? "Web page blocks copied as source text." : "Copy was blocked."); });
 $("copyText").addEventListener("click", async () => { toast((await copyPlain(renderText(state.model))) ? "Plain text copied." : "Copy was blocked."); });
 $("copySubject").addEventListener("click", async () => { toast((await copyPlain($("subject").value)) ? "Subject copied." : "Copy was blocked."); });
 function auditText() { return JSON.stringify(state.audit || { example: true, note: "Build the email first; this is the example compilation.", model: state.model }, null, 2); }
