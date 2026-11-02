@@ -140,3 +140,7 @@ The key lives in the user's settings file or browser and travels only to api.bls
 | 0.3.x | 2026-10-14 | Table 16 read from the BLS PDF; workbook CSV accepted |
 | 0.4.0 | 2026-10-14 | Labor force participation rates in sentences and tables |
 | 0.5.0 | 2026-10-16 | Quality-assurance checks in the audit; web page text blocks; scheduled tasks per release; process documentation |
+
+## Where the page runs
+
+The portal is a single file. It runs from this repository's GitHub Pages address, from a copy opened on a laptop, or served by the VETS evidence site inside Teams. The PDF reader for Table 16 ships next to the page in `vendor/` (pdf.js 3.11.174, Apache-2.0), so a blocked CDN no longer matters; the CDN is only the fallback. When the evidence site serves the page, BLS requests go through that host's relay, which holds the office's registration key, and a note under the key field says so; standing alone, the page calls the BLS API directly with the key typed into it, as before.

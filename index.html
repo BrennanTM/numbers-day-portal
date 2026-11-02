@@ -578,15 +578,21 @@ function parseTable16Text(text) {
 }
 async function loadPdfJs() {
   if (window.pdfjsLib) return window.pdfjsLib;
-  await new Promise((res, rej) => {
-    const sc = document.createElement("script");
-    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-    sc.onload = res; sc.onerror = () => rej(new Error("the PDF reader could not be loaded (cdnjs.cloudflare.com may be blocked here). Type the four rates instead."));
-    document.head.appendChild(sc);
-  });
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  // the reader ships next to this page (vendor/, pdf.js 3.11.174) so a blocked CDN does not matter; the CDN is the fallback
+  const places = [{ lib: "vendor/pdf.min.js", worker: "vendor/pdf.worker.min.js" },
+                  { lib: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js", worker: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js" }];
+  let used = null;
+  for (const place of places) {
+    const ok = await new Promise(res => { const sc = document.createElement("script"); sc.src = place.lib; sc.onload = () => res(true); sc.onerror = () => res(false); document.head.appendChild(sc); });
+    if (ok && window.pdfjsLib) { used = place; break; }
+  }
+  if (!used) throw new Error("the PDF reader could not be loaded (neither the copy next to this page nor cdnjs.cloudflare.com answered). Type the four rates instead.");
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = used.worker;
   return window.pdfjsLib;
 }
+// Where BLS requests go: straight to api.bls.gov when this page stands alone; through the host's relay when it is served by
+// the evidence site (window.DOL_GATEWAY_BASE), which adds the office's registration key so none needs typing here.
+function blsUrl(id, q) { const base = window.DOL_GATEWAY_BASE; return (base ? base + "/bls/" : "https://api.bls.gov/publicAPI/v2/timeseries/data/") + id + "?" + q.toString(); }
 async function pageText(page) {
   const content = await page.getTextContent();
   const lines = new Map();
@@ -741,7 +747,7 @@ async function fetchAll(apiKey, endYear) {
   await Promise.all(Object.entries(SERIES).map(async ([role, id]) => {
     const q = new URLSearchParams({ startyear: String(start), endyear: String(endYear) });
     if (apiKey) { q.set("registrationkey", apiKey); q.set("catalog", "true"); q.set("aspects", "true"); }
-    const body = await getJson("https://api.bls.gov/publicAPI/v2/timeseries/data/" + id + "?" + q.toString());
+    const body = await getJson(blsUrl(id, q));
     if (body.status !== "REQUEST_SUCCEEDED") throw new Error("BLS API " + body.status + ": " + (body.message || []).join("; "));
     const s = ((body.Results || {}).series || [])[0];
     if (!s || !s.data || !s.data.length) throw new Error("BLS API returned no data for " + id + (body.message && body.message.length ? " (" + body.message.join("; ") + ")" : ""));
@@ -927,6 +933,15 @@ renderSchedulePill();
 renderRows();
 showModel(EXAMPLE, true);
 setAlerts([{ kind: "warn", text: "This is the September 2026 example until you build. Save your key, add the Table 16 rows, then press Build." }]);
+
+// Served by the evidence site with a BLS key configured on the host: say so under the key field.
+(function () {
+  const base = window.DOL_GATEWAY_BASE; if (!base) return;
+  fetch(base + "/bls/status", { credentials: "same-origin", cache: "no-store" }).then(r => r.ok ? r.json() : null).then(j => {
+    const el = document.getElementById("keyStatus"); if (!j || !j.configured || !el || document.getElementById("hostKeyNote")) return;
+    el.insertAdjacentHTML("afterend", '<div class="hint" id="hostKeyNote">A shared BLS key is configured on this host, so this field can stay empty; requests go through the host.</div>');
+  }).catch(() => {});
+})();
 </script>
 </body>
 </html>
